@@ -62,9 +62,11 @@ if __name__ == "__main__":
     classifier = classifier.Classifier()
 
 
-    # collect 100,000 observations
-    #preprocessor.collect_data(s, 100000)
-    preprocessor.tokenize("c90b1baa4600000c0aa61ade1b994600000c09a619f01b88a618f50c080605009100009098a0c02000a809910000c02000a9091b88a628e7810000c020009808")
+    # collect 10,000,000 observations
+    preprocessor.collect_data(s, 10000000)
+    raw_data = preprocessor.retreive_data()
+    #preprocessor.tokenize("c90b1baa4600000c0aa61ade1b994600000c09a619f01b88a618f50c080605009100009098a0c02000a809910000c02000a9091b88a628e7810000c020009808")
+    
 
     # train the model given the collected observations and labels
      

@@ -22,14 +22,15 @@ class Preprocessor(object):
         - observations(int): number of observations to collect
     '''
     def collect_data(self, server, observations):
-
-        for _ in range(observations):
+        training_data = []
+        for i in range(observations):
             # request data
             obs = self.curate_training_data(server)
+            training_data.append(obs)
 
-            # store it in the json file
-            with open(self.raw_data_file, 'a') as file:
-                json.dump(obs, file)
+        # store it in the json file
+        with open(self.raw_data_file, 'w') as file:
+            json.dump(training_data, file)
 
 
     '''
@@ -107,9 +108,6 @@ class Preprocessor(object):
                 tokens = [blob[i:i+token_size] for i in range(0,len(blob), token_size)]
                 # add these tokens to our full token list
                 all_tokens.extend(tokens)
-        print(all_tokens)
-        print(len(all_tokens))
-
 
 
     
@@ -145,17 +143,55 @@ class Preprocessor(object):
         # set collection, to eliminate element redundancy
         columns = set()
 
+        # create columns by combining tokens of all blobs into one set
         for freq_map in self.freq_maps:
-            freq_map.keys()
+            columns.add(freq_map.keys())
+        columns = list(columns)
+        
+        data = []
+        # iterate through observations to
+        # create key-value pairs in each frequency
+        # map such that the values are zero for tokens
+        # that dont exist in the frequency map
+        # FIXME: is this by reference or by value? (freq_map getting updated?)
+        for freq_map in self.freq_maps:
+            for column in columns:
+                if column in freq_map:
+                    continue
+                else:
+                    freq_map[column] = 0
+            # sort freq maps 
+            freq_map = sorted(freq_map)
+
+        
+        # at this point, all freq_maps should contain keys for every token
+        # in the corpus, and 0 values for those they dont contain
+        print(self.freq_maps)
+        # sort all freq maps, and combine into a dataframe
+        
 
 
     '''
     '''
-    def create_tf_dict():
+    def create_tf_dict(self):
         pass
 
-    def inverse_doc_freq():
+    def inverse_doc_freq(self):
         pass
 
+
+    '''
+    opens up the raw_data_file and turns the json string into a python object
+
+    creates the feature matrix and label vector
+    '''
+    def retreive_data(self):
+        observations = [] 
+        labels = []
+        
+        data_file = open(self.raw_data_file)
+        for line in data_file:
+            obj = json.loads(line)
+            print(obj)
 
 

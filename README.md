@@ -16,6 +16,21 @@ the instruction aligned binary blob produced by the server is then provided to t
 ### The Oracle
 The post(target) method takes in a guess, and returns the streak, **correct answer**, and hash if challenge was complete. This is important because the correct answer allows us to avoid the problem of manual observation labeling, largely increasing the data we can efficiently equip our model with
 
+
+### Possible Labels
+- avr: 8-bit
+- alphaev56: 
+- arm: 32/64-bit
+- m68k: 16/32-bit
+- mips: 32/64-bit
+- mipsel: 32/64-bit
+- powerpc: 32-bit
+- s390: 32-bit
+- sh4: 32-bit
+- sparc: 32/64-bit
+- x86_64: 64-bit
+- xtensa: 16/24-bit
+
 ### Method
 
 #### Data Curation
@@ -26,6 +41,7 @@ The important pieces of information that are extracted and saved include:
 - `blob`: a string storing the hexadecimal representation of the binary blob given by `server.binary`
 - `possible_ISAs`: the list of six possible ISAs that the binary blob could have been produced by. In including this feature, I hypothesize that the classifier may recognize at some point that it will never produce a successful classification of an observation when the label is not included in the `possible_ISAs` list
 
+#### Tokenization
 
 #### Feature Extraction
 

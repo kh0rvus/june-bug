@@ -112,11 +112,50 @@ class Preprocessor(object):
 
 
 
-    def term_freq():
-        pass
+    
+    '''
+    given a hex blob and a list of tokens, return a dict containing the tokens and number of occurences per token
 
+    params:
+        tokens(list): list of tokens from a single blob
+
+    returns:
+        freq_map(dict): keys=token, values=number of times token appeared
+    '''
+    def term_freq(self, blob, tokens):
+        freq_map = {}
+
+        # loop through all tokens in list
+        for token in tokens:
+            if token in freq_map:
+                freq_map[token] += 1
+            else:
+                # does not exist, add it
+                freq_map[token] = 1
+
+        return freq_map
+        
+
+
+    '''
+    creates token count matrix to be used for tfidf where the rows
+    represent individual blobs and the columns represent tokens
+    '''  
+    def count_vectorize():
+        # set collection, to eliminate element redundancy
+        columns = set()
+
+        for freq_map in self.freq_maps:
+            freq_map.keys()
+
+
+    '''
+    '''
+    def create_tf_dict():
+        pass
 
     def inverse_doc_freq():
         pass
+
 
 

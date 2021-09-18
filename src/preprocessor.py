@@ -27,10 +27,12 @@ class Preprocessor(object):
             # request data
             obs = self.curate_training_data(server)
             training_data.append(obs)
+            print(str(i) + "requests made so far")
 
         # store it in the json file
         with open(self.raw_data_file, 'w') as file:
             json.dump(training_data, file)
+            
 
 
     '''

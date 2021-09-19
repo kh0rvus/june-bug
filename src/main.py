@@ -62,12 +62,23 @@ if __name__ == "__main__":
     classifier = classifier.Classifier()
 
 
-    # collect 10,000,000 observations
+    # collect 300,000 observations
+    # uncomment below if data is needed
     #preprocessor.collect_data(s, 300000)
-    raw_data = preprocessor.retreive_data()
-    #preprocessor.tokenize("c90b1baa4600000c0aa61ade1b994600000c09a619f01b88a618f50c080605009100009098a0c02000a809910000c02000a9091b88a628e7810000c020009808")
-    
 
+    # retreive data from ../data/raw.json
+    observations, labels = preprocessor.retreive_data()
+    
+    print(len(observations[0]))
+    print(observations[0])
+    print(type(observations))
+
+    # extract tokens from corpus
+    tokens_vec = preprocessor.tokenize(observations)
+
+    # extract TF-IDF vector and populate feature matrix and label vector
+    observations = preprocessor.extract_features(observations)
+    
     # train the model given the collected observations and labels
      
     for _ in range(10):

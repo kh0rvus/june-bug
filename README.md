@@ -6,14 +6,13 @@ Machine Learning Multi-Class Classifier to Solve Praetorian's MLB Challenge
 ### The Problem
 
 > "The crux of the challenge is to build a classifier that can automatically identify and categorize the instruction set architecture of a random binary blob. Train a machine learning classifier to identify the architecture of a binary blob given a list of possible architectures. We currently support twelve architectures, including: avr, alphaev56, arm, m68k, mips, mipsel, powerpc, s390, sh4, sparc, x86_64, and xtensa."
-> \- Challenge Description 
 
+> \- Challenge Description 
 
 
 ### Features of Interest
 
 - The binary is instruction aligned, meaning the features we select will need to consider instruction size, rather than analyzing each hex digit, we want to be able to tell our agent to analyze the instructions
-- 
 
 ### The Oracle
 The `post(target)` method takes in a guess, and returns the streak, **correct answer**, as well as a hash used later to prove authenticity of solution. This is important because the correct answer allows us to avoid the problem of manual observation labeling, largely increasing the data we can efficiently equip our model with
@@ -49,9 +48,9 @@ the feature matrix is stored as a multi-dimensional NumPy Array that can be visu
 FIXME: ugly formatting below
 | Index   | Blob      | Possible Label Vector  | TF-IDF Vector                       |
 | ------- | ----      | ---------------        | ------------                        |
-| 0       | 0x01...23 | ['arm', ..., 'x86_64'] | [&psi;_0,&psi_1,..,&psi;_&theta;]  |
+| 0       | 0x01...23 | ['arm', ..., 'x86_64'] | [&psi;_0,&psi;_1,..,&psi;_&theta;]  |
 | 1       | 0x4f...e4 | ['sparc',...,'sh4']    | [&psi;_0,&psi;_1,...,&psi;_&theta;] |
-| ...     | 0x63...3a | ['s390',...,'xtensa']  | [&psi;_0,&psi;_1,...,&psi;_&theta;] |
+| ...     | ...       | ...                    | ...                                 |
 | n       | 0x94...13 | ['powerpc',...,'mips'] | [&psi;_0,&psi;_1,...,&psi;_&theta;] |
 
 #### Blob
@@ -74,7 +73,7 @@ At each element i_&theta; of the array, exists a tf-idf statistic corresponding 
 example: 
 TODO throw example
 
-##### The Tokens Vector
+##### The `tokens_vector`
 Represented in feature matrix depiction as &psi;
 
 Alphabetically-sorted single-dimension NumPy array containg all tokens for a training corpus with length denoted by &Theta;
@@ -92,11 +91,13 @@ In `src/preprocessor`, the `collect_data(server, observations)` function allows 
 The [[important]] pieces of information that are extracted and saved include: 
 - `label`: extracted from `server.ans`, functions as the observation label, enabling us to train our model to produce accurate results
 - `blob`: a string storing the hexadecimal representation of the binary blob given by `server.binary`
-- `possible_ISAs`: the list of six possible ISAs that the binary blob could have been produced by. In including this feature, I hypothesize that the classifier may recognize at some point that it will never produce a successful classification of an observation when the label is not included in the `possible_ISAs` list
+- `possible_ISAs`: the list of six possible ISAs that the binary blob could have been produced by. In including this feature, I hypothesize that the classifier may recognize at some point that it will never produce a successful classification of an observation when the produced label is not included in the `possible_ISAs` list
 
+
+In this implementation, I used `collect_data()` to collect 300,000 observations from the server.
 
 #### Tokenization 
-Bag-of-words 
+After the 300,000 data points has been collected, 
 
 #### Feature Extraction 
 #### Classification 

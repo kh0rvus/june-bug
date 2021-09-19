@@ -191,9 +191,22 @@ class Preprocessor(object):
         observations = [] 
         labels = []
         
+        # create an array within data holding all entries
         data_file = open(self.raw_data_file)
-        for line in data_file:
-            obj = json.loads(line)
-            print(obj)
+        data = json.loads(data_file.readline())
+
+        for observation in data:
+
+            # format features
+            print("label: " + observation['label'])
+            print("blob: " + observation['blob'])
+
+
+
+            
+
+            # format label
+            labels.append(observation['label'])
+
 
 

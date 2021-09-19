@@ -48,7 +48,7 @@ the feature matrix is stored as a multi-dimensional NumPy Array that can be visu
 
 | Index   | Blob      | Possible Label Vector  | TF-IDF Vector                       |
 | ------- | ----      | ---------------        | ------------                        |
-| 0       | 0x01...23 | ['arm', ..., 'x86_64'] | [&psi;_0,&psi;_1,...,&psi;_&theta;] |
+| 0       | 0x01...23 | ['arm', ..., 'x86_64'] | [&psi;_0,&psi_1,..,&psi;_&theta;]  |
 | 1       | 0x4f...e4 | ['sparc',...,'sh4']    | [&psi;_0,&psi;_1,...,&psi;_&theta;] |
 | ...     | 0x63...3a | ['s390',...,'xtensa']  | [&psi;_0,&psi;_1,...,&psi;_&theta;] |
 | n       | 0x94...13 | ['powerpc',...,'mips'] | [&psi;_0,&psi;_1,...,&psi;_&theta;] |

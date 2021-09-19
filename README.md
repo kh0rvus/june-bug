@@ -46,12 +46,12 @@ The `post(target)` method takes in a guess, and returns the streak, **correct an
 the feature matrix is stored as a multi-dimensional NumPy Array that can be visualized as:
 
 
-| Index   | Blob      | Possible Label Vector  | TF-IDF Vector                     |
-| ------- | ----      | ---------------        | ------------                      |
-| 0       | 0x01...23 | ['arm', ..., 'x86_64'] | [&psi_0,&psi_1,...,&psi_&theta;] |
-| 1       | 0x4f...e4 | ['sparc',...,'sh4']    | [&psi_0,&psi_1,...,&psi_&theta;] |
-| ...     | 0x63...3a | ['s390',...,'xtensa']  | [&psi_0,&psi_1,...,&psi_&theta;] |
-| n       | 0x94...13 | ['powerpc',...,'mips'] | [&psi_0,&psi_1,...,&psi_&theta;] |
+| Index   | Blob      | Possible Label Vector  | TF-IDF Vector                       |
+| ------- | ----      | ---------------        | ------------                        |
+| 0       | 0x01...23 | ['arm', ..., 'x86_64'] | [&psi;_0,&psi;_1,...,&psi;_&theta;] |
+| 1       | 0x4f...e4 | ['sparc',...,'sh4']    | [&psi;_0,&psi;_1,...,&psi;_&theta;] |
+| ...     | 0x63...3a | ['s390',...,'xtensa']  | [&psi;_0,&psi;_1,...,&psi;_&theta;] |
+| n       | 0x94...13 | ['powerpc',...,'mips'] | [&psi;_0,&psi;_1,...,&psi;_&theta;] |
 
 #### Blob
 The **Blob** is of type string containing a 128 character hexadecimal representation of the base64-decoded binary blob produced by the server's `get()` API capability.

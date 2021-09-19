@@ -6,7 +6,7 @@ Machine Learning Multi-Class Classifier to Solve Praetorian's MLB Challenge
 ### The Problem
 
 > "The crux of the challenge is to build a classifier that can automatically identify and categorize the instruction set architecture of a random binary blob. Train a machine learning classifier to identify the architecture of a binary blob given a list of possible architectures. We currently support twelve architectures, including: avr, alphaev56, arm, m68k, mips, mipsel, powerpc, s390, sh4, sparc, x86_64, and xtensa."
-> - Challenge Description 
+> \- Challenge Description 
 
 
 
@@ -46,6 +46,7 @@ The `post(target)` method takes in a guess, and returns the streak, **correct an
 the feature matrix is stored as a multi-dimensional NumPy Array that can be visualized as:
 
 
+FIXME: ugly formatting below
 | Index   | Blob      | Possible Label Vector  | TF-IDF Vector                       |
 | ------- | ----      | ---------------        | ------------                        |
 | 0       | 0x01...23 | ['arm', ..., 'x86_64'] | [&psi;_0,&psi_1,..,&psi;_&theta;]  |

@@ -67,18 +67,15 @@ if __name__ == "__main__":
     #preprocessor.collect_data(s, 300000)
 
     # retreive data from ../data/raw.json
-    observations, labels = preprocessor.retreive_data()
-    
-    print(len(observations[0]))
-    print(observations[0])
-    print(type(observations))
-
-    # extract tokens from corpus
-    tokens_vec = preprocessor.tokenize(observations)
+    preprocessor.retreive_data()
 
     # extract TF-IDF vector and populate feature matrix and label vector
-    observations = preprocessor.extract_features(observations)
-    
+    feature_matrix = preprocessor.extract_tfidf()
+    print(feature_matrix)
+    print(len(feature_matrix))
+    print(len(feature_matrix[0]))
+    print(feature_matrix[0])
+
     # train the model given the collected observations and labels
      
     for _ in range(10):

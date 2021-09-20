@@ -1,12 +1,15 @@
 import binascii
 import json
+import numpy as np
+import math
 
 class Preprocessor(object):
 
 
-
     def __init__(self):
         self.raw_data_file = '../data/raw.json'
+        self.observations = []
+        self.labels = []
 
 
     def collect_data(self, server, observations):
@@ -25,7 +28,7 @@ class Preprocessor(object):
         training_data = []
         for i in range(observations):
             # request data
-            obs = self.curate_training_data(server)
+            obs = self.extract_training_data(server)
             training_data.append(obs)
             print(str(i) + "requests made so far")
 
@@ -35,7 +38,7 @@ class Preprocessor(object):
             
 
 
-    def curate_training_data(self, server):
+    def extract_training_data(self, server):
         """ 
         requests the blob, possible target data, and label for training
 
@@ -61,171 +64,125 @@ class Preprocessor(object):
         return observation
 
 
-    def curate_test_data(server):
-        """ 
-        requests the blob and possible target data from the server for the test set,
-        meaning we can't submit nonsense guesses for the labels but instead will need to use 
-        only this data and extracted features to make classifications
-
-        params:
-            - server(object): server object provided by sample code
-        returns:
-            - observation(object): object containing the hex blob in a string and the possible ISAs in a list
-        """ 
-        # request only the blob and possible ISAs
-        server.get()
-
-        # convert to hex for easier analysis
-        hex_blob = bytes.hex(server.binary)
-
-        observation = {
-            "blob": hex_blob,
-            "possible_ISAs": server.targets
-            }
-
-        return observation
-
-
-    def extract_features():
-        """
-        """
-        pass 
-
-    def extract_tfidf_vec():
-        """
-        extracts tdfidf vector for a single observation
-        """ 
-        pass
-
-    def tokenize(self, observations):
-        """
-        given a list of observations, performs tokenization  
-        FIXME: add good explanation of tokenization method right hur 
-
-        """
-    token_vec = set()
-    for observation in observations:
-        blob = observation[0]
-        tokens = tokenize_observation(blob)
-        token_vec.update(tokens)
-
-    # sort in alphanumeric order
-    token_vec = sorted(list(token_vec))
-
-    print(token_vec)
-    print(len(token_vec))
-
-    def tokenize_observation(self, blob):
-        """ 
-        given a hex blob of data, returns a list of all possible tokens
-
-            word size: 1 byte
-            possible token sizes: 1, 2, or 4 words long (8,16, or 32 bits)
-
-        """ 
-        all_tokens = []
-        word_size = 2
-        for token_size in range(2,9): 
-            # ensure that we maintain instruction alignment
-            if token_size % word_size == 0 and token_size != 6:
-                tokens = [blob[i:i+token_size] for i in range(0,len(blob), token_size)]
-                # add these tokens to our full token list
-                all_tokens.extend(tokens)
-
-        return all_tokens
-
-
-    
-    def term_freq(self, blob, tokens):
-        """
-        given a hex blob and a list of tokens, return a dict containing the tokens and number of occurences per token
-
-        params:
-            tokens(list): list of tokens from a single blob
-
-        returns:
-            freq_map(dict): keys=token, values=number of times token appeared
-        """
-        freq_map = {}
-
-        # loop through all tokens in list
-        for token in tokens:
-            if token in freq_map:
-                freq_map[token] += 1
-            else:
-                # does not exist, add it
-                freq_map[token] = 1
-
-        return freq_map
-        
-
-
-    def count_vectorize():
-    """ 
-    creates token count matrix to be used for tfidf where the rows
-    represent individual blobs and the columns represent tokens
-    """
-        # set collection, to eliminate element redundancy
-        columns = set()
-
-        # create columns by combining tokens of all blobs into one set
-        for freq_map in self.freq_maps:
-            columns.add(freq_map.keys())
-        columns = list(columns)
-        
-        data = []
-        # iterate through observations to
-        # create key-value pairs in each frequency
-        # map such that the values are zero for tokens
-        # that dont exist in the frequency map
-        # FIXME: is this by reference or by value? (freq_map getting updated?)
-        for freq_map in self.freq_maps:
-            for column in columns:
-                if column in freq_map:
-                    continue
-                else:
-                    freq_map[column] = 0
-            # sort freq maps 
-            freq_map = sorted(freq_map)
-
-        
-        # at this point, all freq_maps should contain keys for every token
-        # in the corpus, and 0 values for those they dont contain
-        print(self.freq_maps)
-        # sort all freq maps, and combine into a dataframe
-        
-
-
-    def create_tf_dict(self):
-        """
-        """
-        pass
-
-    def inverse_doc_freq(self):
-        """
-        """
-        pass
-
-
     def retreive_data(self):
         """
         opens up the raw_data_file and turns the json string into a python object
 
         creates the feature matrix and label vector
         """
-        observations = [] 
-        labels = []
         
         # create an array within data holding all entries
         data_file = open(self.raw_data_file)
         data = json.loads(data_file.readline())
 
         for observation in data:
-
-            observations.append([ observation['blob'], observation['possible_ISAs']])
+            self.observations.append(self.Observation(observation['blob'], observation['possible_ISAs']))
             # format label
-            labels.append(observation['label'])
+            self.labels.append(observation['label'])
 
-        return observations, labels
+        # FIXME: delete for production
+        self.observations = self.observations[:10]
+        self.labels = self.labels[:10]
 
+    def extract_tfidf(self):
+        """
+        creates a new matrix containing the 
+        observation data plus the tfidf vector for each observation
+
+        returns:
+            feature_matrix(np.array): numpy array of the observation features
+        """
+        self.token_vec = set()
+        feature_matrix = []
+
+        # compute term frequencies and populate token vec
+        for observation in self.observations:
+            term_freq = observation.compute_term_freq()
+            self.token_vec.update(term_freq.keys())
+
+        # sort in token vec in alphanumeric order
+        self.token_vec = sorted(list(self.token_vec))
+        
+        # compute idf val for each token
+        self.idf_vec = []
+        num_observations = len(self.observations)
+        for token in self.token_vec:
+            blobs_with_token = 0
+            for observation in self.observations:
+                # if the token appears in this observation
+                if token in observation.freq_map.keys():
+                    blobs_with_token += 1
+            # compute idf val for this token if denominator is not 0
+            idf_val = math.log(num_observations / blobs_with_token) if blobs_with_token else 0
+
+            self.idf_vec.append(idf_val)
+        
+        
+        for observation in self.observations:
+            observation.tfidf_vec = self.extract_tfidf_vec(observation)
+            feature_matrix.append(observation.tfidf_vec)
+
+        return np.array(feature_matrix)
+
+    def extract_tfidf_vec(self, observation):
+        """
+        extracts tdfidf vector for a single observation
+        """ 
+        tfidf_vec = []
+        for idx in range(len(self.token_vec)):
+            token = self.token_vec[idx]
+            idf_val = self.idf_vec[idx]
+            if token in observation.freq_map.keys():
+                tf_val = observation.freq_map[token]
+                tfidf_vec.append(tf_val * idf_val)
+            else:
+                # if we dont see this token in this observation
+                tfidf_vec.append(0)
+        return tfidf_vec
+
+    class Observation(object):
+        def __init__(self, blob, possible_labels):
+            self.blob = blob
+            self.possible_labels = possible_labels
+            self.freq_map = {}
+            self.tfidf_vec = []
+        
+
+        def compute_term_freq(self):
+            """
+            creates a dict containing the tokens and term frequency
+            per token for this observation
+
+            term frequency(token) = appearances of token / number of tokens in document
+            """
+            tokens = self.tokenize()
+            # loop through all tokens in list
+            for token in tokens:
+                if token in self.freq_map:
+                    appearances = self.freq_map[token] * len(tokens)
+                    self.freq_map[token] = (appearances + 1) / len(tokens)
+                else:
+                    # does not exist, add it
+                    self.freq_map[token] = 1 / len(tokens)
+
+            return self.freq_map
+
+        def tokenize(self):
+            """ 
+            returns a list of all possible tokens for this observation
+
+                word size: 1 byte
+                possible token sizes: 1, 2, or 4 words long (8,16, or 32 bits)
+
+            """ 
+            all_tokens = []
+            word_size = 2
+            for token_size in range(2,9): 
+                # ensure that we maintain instruction alignment
+                if token_size % word_size == 0 and token_size != 6:
+                    tokens = [self.blob[i:i+token_size] for i in range(0,len(self.blob), token_size)]
+                    # add these tokens to our full token list
+                    all_tokens.extend(tokens)
+
+            return all_tokens
 

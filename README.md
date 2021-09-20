@@ -68,7 +68,7 @@ example:
 #### TF-IDF Vector
 The **TF-IDF Vector** is a single-dimension NumPy array of length &Theta; 
 
-At each element i_&theta; of the array, exists a tf-idf statistic corresponding to the token at index &theta; of the *Tokens Vector*
+At each element i_&theta; of the array, exists a tf-idf weight corresponding to the token at index &theta; of the *Tokens Vector*
 
 example: 
 TODO throw example
@@ -100,11 +100,16 @@ In this implementation, I used `collect_data()` to collect 300,000 observations 
 After the 300,000 data points has been collected, 
 
 #### Feature Extraction 
+
 #### Classification 
 ##### Training 
 ##### Testing
 
+
+view more in depth [documentation](./docs.md)
 ### Misc
 - My cookie: 0ccbc0c1-e093-4329-9fea-76f78f2b076c
 - [Skip-Thought Vectors](https://arxiv.org/abs/1506.06726)
 - 
+
+

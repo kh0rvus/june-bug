@@ -58,8 +58,6 @@ if __name__ == "__main__":
     # create the preprocessor object
     preprocessor = preprocessor.Preprocessor()
 
-    # create the classifier object
-    classifier = classifier.Classifier()
 
 
     # collect 300,000 observations
@@ -71,10 +69,12 @@ if __name__ == "__main__":
 
     # extract TF-IDF vector and populate feature matrix and label vector
     feature_matrix = preprocessor.extract_tfidf()
-    print(feature_matrix)
-    print(len(feature_matrix))
-    print(len(feature_matrix[0]))
-    print(feature_matrix[0])
+
+    # create the classifier object
+    classifier = classifier.Classifier(feature_matrix, preprocessor.labels)
+    
+    # seperate observations by label
+    classes = classifier.create_classes()
 
     # train the model given the collected observations and labels
      

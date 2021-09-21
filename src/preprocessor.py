@@ -81,8 +81,8 @@ class Preprocessor(object):
             self.labels.append(observation['label'])
 
         # FIXME: delete for production
-        self.observations = self.observations[:10]
-        self.labels = self.labels[:10]
+        self.observations = self.observations[:100]
+        self.labels = self.labels[:100]
 
     def extract_tfidf(self):
         """

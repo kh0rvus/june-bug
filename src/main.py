@@ -74,7 +74,11 @@ if __name__ == "__main__":
     classifier = classifier.Classifier(feature_matrix, preprocessor.labels)
     
     # seperate observations by label
-    classes = classifier.create_classes()
+    classifier.create_classes()
+
+    # extract statistics by label
+    classifier.extract_statistics_by_label()
+
 
     # train the model given the collected observations and labels
      

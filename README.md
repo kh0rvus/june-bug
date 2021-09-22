@@ -10,12 +10,9 @@ Machine Learning Multi-Class Classifier to Solve Praetorian's MLB Challenge
 > \- Challenge Description 
 
 
-### Features of Interest
-
-- The binary is instruction aligned, meaning the features we select will need to consider instruction size, rather than analyzing each hex digit, we want to be able to tell our agent to analyze the instructions
 
 ### The Oracle
-The `post(target)` method takes in a guess, and returns the streak, **correct answer**, as well as a hash used later to prove authenticity of solution. This is important because the correct answer allows us to avoid the problem of manual observation labeling, largely increasing the data we can efficiently equip our model with
+The `post(target)` method takes in a guess, and returns the streak, **correct answer**, as well as a hash used later to prove authenticity of solution. This is important because the correct answer allows us to avoid the problem of manual observation labeling, largely increasing the data we can feasibly equip our model with
 
 
 ### Possible Labels
@@ -33,8 +30,58 @@ The `post(target)` method takes in a guess, and returns the streak, **correct an
 - xtensa: 16/24-bit
 
 
-## Data Structures
+## Method
 
+#### Data Curation
+Using the provided API, my first step was to collect and format 300,000 data points.
+
+As a method of formatting, I opted to store the following values within python dictionaries for each observation aggregated together in a list containing all the observations:
+
+- `label`: extracted from `server.ans`, functions as the observation label, enabling us to train our model to produce accurate results
+- `blob`: a string storing the hexadecimal representation of the binary blob given by `server.binary`
+- `possible_ISAs`: the list of six possible ISAs that the binary blob could have been produced by, given by `server.targets`
+
+After requesting the 300,000 data points, the new training set is written to a local json file and the `data_curation()` function can be commented out to reduce excessive traffic to the server.
+
+
+#### Tokenization 
+After observations and labels have been made available, tokenization must occur. 
+
+*Tokenization* can be thought of as a process by which a document is decomposed into a set of components such that the components may be individually analyzed and used to extract new features from the data.
+
+Based upon a few minuts spent on wikipedia finding the instruction size for each of the 12 architectures, I decided to create tokens of the following sizes:
+- 8 bits (2 hex chars)
+- 16 bits (4 hex chars)
+- 32 bits (8 hex chars)
+
+I was not able to find an archetecture in the list which used only 24 bits, so to reduce memory complexity, I opted to only produce the aforementioned token sizes 
+
+#### Feature Extraction 
+Perhaps the most important aspect of machine learning is *feature extraction*, or encoding of real world information into a format that is easily accessible by the underlying mathematical equations that govern the decisions of our agents.
+
+In this solution, I followed the tutorial's advice and implemented the *Term-Frequency Inverse Document Frequency* feature extraction method to create a vectorized version of the training data. This vectorized data structure can be visualized in the *Code Documentation* section.
+
+TF-IDF aims to extract information from tokenized text data by assigning a weight to each token of an observation that **increases** as the number of occurences of the token within said *observation* grows, but **decreases** as the number of occurences of the token within the *corpus* grows.
+
+More specifically, tf-idf for token t can be described as:
+
+FIXME: insert tfidf equation
+
+#### Classification 
+I chose the Naive Bayes(a.k.a Idiot Bayes) Algorithm as a classifier due to its relative simplicity yet generally accurate classification capability for IID (Independent and Identically Distributed) features
+
+Though this is an assumption that I do not have evidence to substantiate, I chose to invoke it anyways in an effort to keep the solution simple, and only to add complexity if absolutely necessary. 
+
+Another assumption that is invoked is the distribution type; which again in an effort to keep things simple, I opted to assume that the tfidf weights for each token belong to a Gaussian Distribution
+
+
+##### Training 
+##### Testing
+
+## Code Documentation
+### Preprocessor
+#### Data Structures
+#### Functions
 ### Feature Matrix
 
 - N = observations
@@ -45,13 +92,12 @@ The `post(target)` method takes in a guess, and returns the streak, **correct an
 the feature matrix is stored as a multi-dimensional NumPy Array that can be visualized as:
 
 
-FIXME: ugly formatting below
-| Index   | Blob      | Possible Label Vector  | TF-IDF Vector                       |
-| ------- | ----      | ---------------        | ------------                        |
-| 0       | 0x01...23 | ['arm', ..., 'x86_64'] | [&psi;_0,&psi;_1,..,&psi;_&theta;]  |
-| 1       | 0x4f...e4 | ['sparc',...,'sh4']    | [&psi;_0,&psi;_1,...,&psi;_&theta;] |
-| ...     | ...       | ...                    | ...                                 |
-| n       | 0x94...13 | ['powerpc',...,'mips'] | [&psi;_0,&psi;_1,...,&psi;_&theta;] |
+| Index   | TF-IDF Vector                       |
+| ------- | ------------                        |
+| 0       | [&psi;_0,&psi;_1,..,&psi;_&theta;]  |
+| 1       | [&psi;_0,&psi;_1,...,&psi;_&theta;] |
+| ...     | ...                                 |
+| n       | [&psi;_0,&psi;_1,...,&psi;_&theta;] |
 
 #### Blob
 The **Blob** is of type string containing a 128 character hexadecimal representation of the base64-decoded binary blob produced by the server's `get()` API capability.
@@ -83,30 +129,7 @@ example:
 TODO throw an example here
 
 
-### Method
 
-#### Data Curation
-In `src/preprocessor`, the `collect_data(server, observations)` function allows the aggregation of `observations` number of data points by iteratively sending GET and POST requests to the server through the provided sample code functions.
-
-The [[important]] pieces of information that are extracted and saved include: 
-- `label`: extracted from `server.ans`, functions as the observation label, enabling us to train our model to produce accurate results
-- `blob`: a string storing the hexadecimal representation of the binary blob given by `server.binary`
-- `possible_ISAs`: the list of six possible ISAs that the binary blob could have been produced by. In including this feature, I hypothesize that the classifier may recognize at some point that it will never produce a successful classification of an observation when the produced label is not included in the `possible_ISAs` list
-
-
-In this implementation, I used `collect_data()` to collect 300,000 observations from the server.
-
-#### Tokenization 
-After the 300,000 data points has been collected, 
-
-#### Feature Extraction 
-
-#### Classification 
-##### Training 
-##### Testing
-
-
-view more in depth [documentation](./docs.md)
 ### Misc
 - My cookie: 0ccbc0c1-e093-4329-9fea-76f78f2b076c
 - [Skip-Thought Vectors](https://arxiv.org/abs/1506.06726)

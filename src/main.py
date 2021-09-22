@@ -50,6 +50,20 @@ class Server(object):
         self.ans  = r.get('target', 'unknown')
         return r
 
+    def save_test_data(self, training_data, data_file_path, binary, possible_labels, answer):
+        """
+        optional functionality that allows the user to save test data 
+        allowing for less data waste than just disposing of observations
+        after attempting to predict
+        """
+        print(type(training_data))
+        new_obs = {"blob": binary, "possible_ISAs": possible_labels, "label": answer}
+        training_data.append(new_obs)
+        with open(data_file_path, 'w') as file:
+            json.dump(training_data, file)
+
+        return
+
 if __name__ == "__main__":
 
     # create the server object
@@ -71,25 +85,26 @@ if __name__ == "__main__":
     feature_matrix = preprocessor.extract_tfidf()
 
     # create the classifier object
-    classifier = classifier.Classifier(feature_matrix, preprocessor.labels)
+    classifier = classifier.Classifier(feature_matrix, preprocessor.labels, preprocessor.token_vec)
     
-    # seperate observations by label
-    classifier.create_classes()
-
-    # extract statistics by label
-    classifier.extract_statistics_by_label()
-
-
     # train the model given the collected observations and labels
-     
-    for _ in range(10):
-        # query the /challenge endpoint
-        #s.get()
-         
-        #target = classifier.predict()
-        #s.post(target)
+    classifier.train()
 
-        #s.log.info("Guess:[{: >9}]   Answer:[{: >9}]   Wins:[{: >3}]".format(target, s.ans, s.wins))
+
+     
+    for _ in range(1000):
+        # query the /challenge endpoint
+        s.get()
+
+        # preprocess using the blob and possible ISAs
+        observation = preprocessor.prediction_preprocess(s.binary, s.targets) 
+
+        # make prediction!
+        target = classifier.predict(observation)
+        s.post(target)
+        
+        s.save_test_data(preprocessor.raw_data, preprocessor.raw_data_file, s.binary, s.targets, s.ans)
+        s.log.info("Guess:[{: >9}]   Answer:[{: >9}]   Wins:[{: >3}]".format(target, s.ans, s.wins))
         
 
         # 500 consecutive correct answers are required to win
@@ -97,3 +112,4 @@ if __name__ == "__main__":
         if s.hash:
             s.log.info("You win! {}".format(s.hash))
 
+    

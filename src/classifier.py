@@ -2,64 +2,96 @@ import numpy as np
 from math import sqrt
 from math import pi
 from math import exp
+import preprocessor
 
 class Classifier(object):
 
-    def __init__(self, feature_matrix, labels):
-        self.data = feature_matrix
+    def __init__(self, feature_matrix, labels, token_vec):
+        self.observations = feature_matrix
         self.labels = labels
-        self.classes = {
-                'avr':[],
-                'alphaev56':[],
-                'arm':[],
-                'm68k':[], 
-                'mips':[],
-                'mipsel':[],
-                'powerpc':[],
-                's390':[],
-                'sh4':[],
-                'sparc':[],
-                'x86_64':[],
-                'xtensa':[]
+        self.token_vec = token_vec
+
+        self.obs_by_label = {
+                "avr":[],
+                "alphaev56":[],
+                "arm":[],
+                "m68k":[],
+                "mips":[],
+                "mipsel":[],
+                "powerpc":[],
+                "s390":[],
+                "sh4":[],
+                "sparc":[],
+                "x86_64":[],
+                "xtensa":[]
                 }
         self.stats_by_label = {}
 
+    def train(self):
+        """
+        Train the classifier on training data provided by self.data
+        with labels provided by self.labels
+        """
+        # seperate observations by label
+        self.seperate_by_labels()
 
-    def create_classes(self):
+        # extract statistics by label
+        self.extract_statistics_by_label()
+
+
+    def seperate_by_labels(self):
         """
         group observations by label by populating self.classes
         """
 
-        for idx in range(len(self.labels)): 
+        assert len(self.observations) == len(self.labels), 'number of \
+                observations differs from number of labels'
+
+        # labels and data is aligned, so we can iterate through 
+        # observation only
+
+        for idx in range(len(self.observations)): 
+            # save label
             label = self.labels[idx]
-            observation = self.data[idx]
-            self.classes[label].append(observation)
+            # save observation
+            observation = self.observations[idx]
+            # append this observation to our list of observations for this label
+            self.obs_by_label[label].append(observation)
 
 
     def extract_statistics_by_label(self):
         """
-        calls self.extract_statistics() for each label
+        calls self.extract_statistic() for each label
         """
-        all_statistics = {}
-        for label, data in self.classes.items():
-            all_statistics[label] = self.extract_statistics(data)
 
-    def extract_statistics(self, data):
+        for label, observations in self.obs_by_label.items():
+            # store mean and std_dev of each token for each label
+            self.stats_by_label[label] = self.extract_statistics(observations)
+
+    def extract_statistics(self, observations):
         """
         extracts the mean and standard deviation of the tfidf weights for 
         each token
-
         params:
-            data(2-D List): 2 dimensional list of tfidf weights where rows are observations and columns are possible tokens
+            data(2-D List): 2 dimensional list of tfidf weights where rows 
+            are observations and columns are possible tokens
         """
-        statistics = []
+        statistics = {
+                "num_obs": len(observations),
+                "mean_vals": [],
+                "std_vals": []
+                }
 
+        idx = 0
         # go through each column
-        for col in range(len(data[0])):
+        for col in range(len(self.token_vec)):
+            idx += 1
+            print("[...] extracting mean and standard deviation of tfidf-weights for each token" + 
+                    idx + '/' + len(self.token_vec))
             # create list for entries of this column
             vals = []
             # for every row in the column
-            for row in data:
+            for row in observations:
                 # add value to list 
                 vals.append(row[col])
         
@@ -67,11 +99,15 @@ class Classifier(object):
             std = np.std(vals)
             # compute mean over list
             mean = np.mean(vals)
-            # add mean, std_dev, and number of observations to statistics
-            statistics.append((mean, std, len(data)))
-        # convert statistics to a tuple
-        statistics = tuple(statistics)
+
+            # add mean and std_dev to statistics
+            statistics["mean_vals"].append(mean)
+            statistics["std_vals"].append(std)
+
+        print("[+] extracted mean and standard deviation of tfidf-weights for each token")
+        # statistics should be a dictionary
         return statistics
+
 
     def calculate_gaussian_probability(self, x, mean, std_dev):
         """ Calculate the Gaussian probability distribution function for x
@@ -79,9 +115,53 @@ class Classifier(object):
         exponent = exp(-((x-mean)**2 / (2 * std_dev**2 )))
         return (1 / (sqrt(2 * pi) * std_dev)) * exponent
 
-    def train():
-        pass
 
-    def predict():
-        pass
+    def predict(self, observation):
+        """
+        P(label|observation) = 
+
+        if label exists in possible_ISA's list: 
+        P(token_0_tfw|label) *...* P(token_m_tfw|label) * (P(label) * 2)
+
+        else: 
+        0
+
+        probability of observation belonging to a label is the product of 
+        the individual probabilities of observing the observed token 
+        tfidf weights within the training set for this label multiplied 
+        by the product of two and the probability of observing this label 
+        in the training set, since we can reduce our search space by 50% 
+        using the possible_labels given by the server
+
+        params:
+            observation(observation object): observation object containing 
+            the observation whose label we would like to predict
+
+        returns
+            prediction(string): label we predict for this observation
+        """
+        probabilities = {}
+
+        # only compute probabilities for the server
+        # designated "possible labels"
+        for label in observation.possible_labels:
+            # probability of observing this label in our training set
+            probability = float(self.stats_by_label[label]["num_obs"]) / len(self.observations)
+            # compute probability of tfidf weight for each token given this label
+            for idx in range(len(self.token_vec)):
+                observed_val = observation.tfidf_vec[idx]
+                mean = self.stats_by_label[label]["mean_vals"][idx]
+                std = self.stats_by_label[label]["std_vals"][idx]
+                prob_of_tfidf_weight = self.calculate_gaussian_probability(observed_val, mean, std)
+                # update probability of observing this label
+                probability *= prob_of_tfidf_weight
+
+            # double probability since we have reduced search in half
+            probabilities[label] = probability * 2
+        # sort the probabilities by values, and return highest prob key-pair
+        prediction = sorted(probabilities.items(), key=lambda x: x[1])[0]
+
+        return prediction
+
+
 

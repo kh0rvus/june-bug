@@ -109,8 +109,8 @@ class Preprocessor(object):
             self.labels.append(observation['label'])
 
         # FIXME: delete for production
-        self.observations = self.observations[:50000]
-        self.labels = self.labels[:50000]
+        self.observations = self.observations
+        self.labels = self.labels
         print("[+] retreived data")
         return 
 
@@ -127,8 +127,8 @@ class Preprocessor(object):
 
         idx = 0
         # compute term frequencies and populate token vec
-        for observation in self.observations:j
-            print('[...] computing training term frequencies: '+ idx + '/' +  len(self.observations))
+        for observation in self.observations:
+            print('[...] computing training term frequencies: '+ str(idx) + '/' +  str(len(self.observations)))
             term_freq = observation.compute_term_freq()
             self.token_vec.update(term_freq.keys())
             idx += 1
@@ -145,7 +145,7 @@ class Preprocessor(object):
             blobs_with_token = 0
             for observation in self.observations:
                 idx +=1
-                print('[...] computing idf values for each token: '+ idx + '/' +  len(self.observations))
+                print('[...] computing idf values for each token: '+ str(idx) + '/' +  str(len(self.observations) * len(self.token_vec)))
                 # if the token appears in this observation
                 if token in observation.freq_map.keys():
                     blobs_with_token += 1
@@ -154,12 +154,12 @@ class Preprocessor(object):
 
             self.idf_vec.append(idf_val)
         
-        print('[...] computed idf values for each token')
+        print('[+] computed idf values for each token')
         # compute tfidf vector for each observation 
         idx = 0
         for observation in self.observations:
             idx +=1
-            print('[...] computing tfidf vector for each observation:' + idx + '/' + len(self.observations))
+            print('[...] computing tfidf vector for each observation:' + str(idx) + '/' + str(len(self.observations)))
             observation.tfidf_vec = self.extract_tfidf_vec(observation)
             feature_matrix.append(observation.tfidf_vec)
 

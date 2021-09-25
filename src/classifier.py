@@ -4,6 +4,10 @@ from math import pi
 from math import exp
 import preprocessor
 
+# constant for use in finding gaussian probability
+# defined up here to reduce memory redundance
+SQRT_2PI = np.float32((2*pi) ** 0.5)
+
 class Classifier(object):
 
     def __init__(self, feature_matrix, labels, token_vec):
@@ -79,7 +83,7 @@ class Classifier(object):
         statistics = {
                 "num_obs": len(observations),
                 "mean_vals": [],
-                "std_vals": []
+                "sigma_vals": []
                 }
 
         idx = 0
@@ -96,24 +100,19 @@ class Classifier(object):
                 vals.append(row[col])
         
             # compute std dev over list
-            std = np.std(vals)
+            sigma = np.float32(np.std(vals))
             # compute mean over list
-            mean = np.mean(vals)
+            mean = np.float32(np.mean(vals))
 
             # add mean and std_dev to statistics
             statistics["mean_vals"].append(mean)
-            statistics["std_vals"].append(std)
+            statistics["sigma_vals"].append(sigma)
 
         print("[+] extracted mean and standard deviation of tfidf-weights for each token")
         # statistics should be a dictionary
         return statistics
 
 
-    def calculate_gaussian_probability(self, x, mean, std_dev):
-        """ Calculate the Gaussian probability distribution function for x
-        """
-        exponent = exp(-((x-mean)**2 / (2 * std_dev**2 )))
-        return (1 / (sqrt(2 * pi) * std_dev)) * exponent
 
 
     def predict(self, observation):
@@ -150,18 +149,26 @@ class Classifier(object):
             # compute probability of tfidf weight for each token given this label
             for idx in range(len(self.token_vec)):
                 observed_val = observation.tfidf_vec[idx]
+                # grab mean and sigma for this token given this label
                 mean = self.stats_by_label[label]["mean_vals"][idx]
-                std = self.stats_by_label[label]["std_vals"][idx]
-                prob_of_tfidf_weight = self.calculate_gaussian_probability(observed_val, mean, std)
+                sigma = self.stats_by_label[label]["sigma_vals"][idx]
+                # calculate gaussian probability 
+                prob_of_tfidf_weight = calculate_gaussian_probability(observed_val, mean, sigma)
                 # update probability of observing this label
                 probability *= prob_of_tfidf_weight
 
             # double probability since we have reduced search in half
             probabilities[label] = probability * 2
+
         # sort the probabilities by values, and return highest prob key-pair
         prediction = sorted(probabilities.items(), key=lambda x: x[1])[0]
 
         return prediction
 
 
-
+# added decorator to explicitly cast and specify cuda as runtime
+@vectorize('[float32(float32, float32, float32)'], target='cuda')
+def calculate_gaussian_probability(x, mean, sigma):
+    """ Calculate the Gaussian probability distribution function for x
+    """
+    return exp(-0.5 * ((x - mean) / sigma**2) / (sigma * SQRT_2PI)

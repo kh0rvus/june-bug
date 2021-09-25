@@ -87,7 +87,7 @@ class Classifier(object):
         for col in range(len(self.token_vec)):
             idx += 1
             print("[...] extracting mean and standard deviation of tfidf-weights for each token" + 
-                    idx + '/' + len(self.token_vec))
+                    str(idx) + '/' + str(len(self.token_vec)))
             # create list for entries of this column
             vals = []
             # for every row in the column

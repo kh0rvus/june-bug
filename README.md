@@ -74,8 +74,13 @@ Though this is an assumption that I do not have evidence to substantiate, I chos
 
 Another assumption that is invoked is the distribution type; which again in an effort to keep things simple, I opted to assume that the tfidf weights for each token belong to a Gaussian Distribution
 
+It is important to note that in stochastic processes, such as financial markets and intrusion detection, these are two very hefty claims that can negatively impact the design and ultimately the performance of machine learning agents if they do not hold in the test data-set.
 
 ##### Training 
+Training the model consists of computing, for each label, the mean and standard deviation of each token's tfidf weights within the set of observations belonging to said label
+
+These statistics can then be used to describe a Guassian distribution for each token that will later be used for finding the probability of observing a certain tfidf weight for a certain token given a label
+
 ##### Testing
 
 ## Code Documentation

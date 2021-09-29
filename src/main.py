@@ -4,6 +4,7 @@ import base64
 import time
 import preprocessor
 import classifier
+import data_collector
 
 logging.basicConfig(level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -72,17 +73,12 @@ if __name__ == "__main__":
     # create the preprocessor object
     preprocessor = preprocessor.Preprocessor()
 
-
-
     # collect 300,000 observations
     # uncomment below if data is needed
-    #preprocessor.collect_data(s, 300000)
-
-    # retreive data from ../data/raw.json
-    preprocessor.retreive_data()
+    #data_collector.collect(s, 300000, preprocessor.raw_data_file)
 
     # extract TF-IDF vector and populate feature matrix and label vector
-    feature_matrix = preprocessor.extract_tfidf()
+    feature_matrix = preprocessor.preprocess()
 
     # create the classifier object
     classifier = classifier.Classifier(feature_matrix, preprocessor.labels, preprocessor.token_vec)

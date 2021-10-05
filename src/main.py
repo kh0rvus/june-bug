@@ -79,7 +79,6 @@ if __name__ == "__main__":
 
     # extract TF-IDF vector and populate feature matrix and label vector
     feature_matrix = preprocessor.preprocess()
-
     # create the classifier object
     classifier = classifier.Classifier(feature_matrix, preprocessor.labels, preprocessor.token_vec)
     

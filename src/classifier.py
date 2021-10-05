@@ -167,8 +167,7 @@ class Classifier(object):
 
 
 # added decorator to explicitly cast and specify cuda as runtime
-@vectorize('[float32(float32, float32, float32)'], target='cuda')
 def calculate_gaussian_probability(x, mean, sigma):
     """ Calculate the Gaussian probability distribution function for x
     """
-    return exp(-0.5 * ((x - mean) / sigma**2) / (sigma * SQRT_2PI)
+    return exp(-0.5 * ((x - mean) / sigma**2) / (sigma * SQRT_2PI))

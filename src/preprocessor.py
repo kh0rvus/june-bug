@@ -66,14 +66,54 @@ class Preprocessor(object):
         print(len(self.idf_vals))
         exit()
 
-    @vectorize([uint32(float64)])
-    def populate_occurances(token): 
+    @cuda.jit
+    def idf_kernel(): 
         '''
-        a vectorized function that takes scalars as 
-        '''
-        # 
+        CUDA Kernel that where the loop being represented in iteration through
+        all tokens, thus thread.idx is used to index into the idf_vals array as
+        well as the tokens array 
 
-        # 
+        has access to the following device arrays:
+        - tokens (m-dim array): each element is one of possible tokens
+        - observations (n*l-dim array): each element is an array representing tokenized observation
+        - idf_vals (m-dim array): output device representing idf vals
+        '''
+        #FIXME: debug and documentation
+        # calculate position (cuda.thread.idx)
+        #position = cuda.thread.idx
+        token = device.tokens[position]
+        # number of times token occurs in corpus
+        count = 0
+        # iterating through all observations to search for this token
+        for obs in device.observations:
+            # reduce redundancy
+            obs = set(obs)
+        # should have been observed at least once if it was in the token vector
+        assert (count > 0)
+        idf_vals[position] = math.log(len(observations)) / count if count else 0
+
+
+
+    @cuda.jit
+    def tfidf_kernel(bin_count_obs):
+        '''
+        CUDA Kernel that computes a tfidf vector for an observation
+        using the device idf_vals array and tokens array. Loop being
+        represented is through the tokens such that each thread
+        computes the tfidf value for a single token within this
+        observation
+
+        the observation parameter, bin_count_obs is a numpy array generated
+        from the np.bincount() function, giving an array that we can index
+        to using a token, and retreive the number of times it occured within
+        this observation
+        '''
+        # calculate position
+        token = tokens[position]
+        idf_val = idf_vals[position]
+        occurences = bin_count_obs[token]
+        # FIXME: use old preprocess to recreate formula
+        tf_idf_vec = 
 
  
     def prediction_preprocess(self, blob, possible_labels):

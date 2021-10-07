@@ -22,7 +22,7 @@ class Preprocessor(object):
         self.retreive_data()
 
         # list to store preprocessed feature matrix
-        feature_matrix = []
+        self.feature_matrix = []
         # list to store tokenized observations
         self.tokenized_obs = []
         # set to store all tokens observed
@@ -39,86 +39,43 @@ class Preprocessor(object):
         self.tokenized_obs = np.array(self.tokenized_obs)
         self.tokens = np.array(sorted(tuple(token_set)), dtype=np.uint32)
         # copy data to device
-        #d_observations = cuda.const.array_like(self.tokenized_obs)
-        #d_tokens = cuda.const.array(self.tokens)
+        d_tokenized_obs = cuda.to_device(self.tokenized_obs)
+        d_tokens = cuda.to_device(self.tokens)
 
-        idf_vals = np.empty(shape=self.tokens.shape, dtype=np.single)
-        d_idf_vals = cuda.to_device(idf_vals)
+        idf_vec = np.empty(shape=self.tokens.shape, dtype=np.single)
+        d_idf_vec = cuda.to_device(idf_vec)
 
         # define kernel params 
         threadsperblock = 1024
         blockspergrid = (self.tokens.size + (threadsperblock - 1)) // threadsperblock
 
         print("[...] computing inverse document frequency vector")
-        #idf_kernel[blockspergrid, threadsperblock](tokens, d_observations, d_idf_vals)
         #FIXME: change idf vals to idf vec
-        idf_kernel[blockspergrid, threadsperblock](self.tokens, self.tokenized_obs, idf_vals)
+        idf_kernel[blockspergrid, threadsperblock](d_tokens, d_tokenized_obs, d_idf_vec)
 
         print("[+] computed inverse document frequency vector!")
 
         # free up memory
-        #d_observations.copy_to_host()
+        d_tokenized_obs.copy_to_host()
 
         # compute tfdif vector for each observation
         for observation in self.tokenized_obs:
             # copy data to device
             tfidf_vec = np.empty(shape=self.tokens.shape, dtype=np.single)
             d_tfidf_vec = cuda.to_device(tfidf_vec)
-
-            # flip observations, elements <> index 
-            bin_count_obs = np.bincount(observation)
+            d_observation = cuda.to_device(observation)
 
             # FIXME: hacky solution to not knowing how to pass scalars
             n = np.array((len(self.tokenized_obs),), dtype=np.uint32)
             # compute tfdif vector for this observation 
-            tfidf_kernel[blockspergrid, threadsperblock](self.tokenized_obs, self.tokens, idf_vals, tfidf_vec, n)
+            tfidf_kernel[blockspergrid, threadsperblock](d_observation, d_tokens, d_idf_vec, d_tfidf_vec, n)
 
             # copy data back to host
             tfidf_vec = d_tfidf_vec.copy_to_host()
             print(tfidf_vec)
-            exit()
             self.feature_matrix.append(tfidf_vec)
 
-    @cuda.jit
-    def tfidf_kernel(obs, tokens, idf_vals, n, tfidf_vec):
-        '''
-        CUDA Kernel that computes a tfidf vector for an observation
-
-        the loop being represented by the kernel is iteration 
-        through each token such that each thread computes the 
-        tfidf value for a single token for this observation
-
-        this means that this function will need to be called 
-        n times (where n is number of observations)
-
-        params:
-            - bin_count_obs(l-dim np.array): array generated from np.bincount(),
-            giving an array that we can index into  using a token, and 
-            retreive the number of times it occured within this observation
-            - tokens(m-dim np.array): all tokens in the corpus
-            - idf_vals(m-dim np.array): idf value for each token in the corpus
-            - n(int): number of observations in corpus
-            - tfidf_vec(m-dim np.array): output array for threads in this observation
-        '''
-        assert idf_vals.size == tokens.size
-
-        # calculate position
-        position = cuda.threadIdx.x
-
-        # perform bounds checking
-        if position < tokens.size:
-            # dereference values
-            token = tokens[position]
-            idf_val = idf_vals[position]
-            occurences = bin_count_obs[token]
-            # FIXME: this line is kinda hacky,
-            # need to look in to how to create global scalars at compile time
-            term_freq = occurences / n[0]
-            # set tfidf value
-            tfidf_vec[position] = term_freq * idf_val
-print(self.feature_matrix)
-exit()
-
+        print(self.feature_matrix)
 
  
     def retreive_data(self):
@@ -140,7 +97,7 @@ exit()
         true_labels = []
 
         # populate our output lists
-        for data_point in raw_data[:1000]:
+        for data_point in raw_data:
             observations.append(data_point['blob'])
             possible_labels.append(data_point['possible_ISAs'])
             true_labels.append(data_point['label'])
@@ -248,4 +205,46 @@ def idf_kernel(tokens, observations, idf_vals):
 
 
 
+
+@cuda.jit
+def tfidf_kernel(observation, tokens, idf_vec, n, tfidf_vec):
+    '''
+    CUDA Kernel that computes a tfidf vector for an observation
+
+    the loop being represented by the kernel is iteration 
+    through each token such that each thread computes the 
+    tfidf value for a single token for this observation
+
+    this means that this function will need to be called 
+    n times (where n is number of observations)
+
+    params:
+        - bin_count_obs(l-dim np.array): array generated from np.bincount(),
+        giving an array that we can index into  using a token, and 
+        retreive the number of times it occured within this observation
+        - tokens(m-dim np.array): all tokens in the corpus
+        - idf_vals(m-dim np.array): idf value for each token in the corpus
+        - n(int): number of observations in corpus
+        - tfidf_vec(m-dim np.array): output array for threads in this observation
+    '''
+    assert idf_vec.size == tokens.size
+
+    # calculate position
+    position = cuda.threadIdx.x
+
+    # perform bounds checking
+    if position < tokens.size:
+        # dereference values
+        token = tokens[position]
+        idf_val = idf_vec[position]
+        # find number of occurences of this token in this observation
+        occurences = 0
+        for obs_token in observation:
+            if obs_token == token:
+                occurences += 1
+        # FIXME: this line is kinda hacky,
+        # need to look in to how to create global scalars at compile time
+        term_freq = occurences / n[0]
+        # set tfidf value
+        tfidf_vec[position] = term_freq * idf_val
 

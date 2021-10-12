@@ -72,8 +72,15 @@ class Preprocessor(object):
 
             # copy data back to host
             tfidf_vec = d_tfidf_vec.copy_to_host()
+            # free up memory
+            d_observation.copy_to_host()
+
             print(tfidf_vec)
             self.feature_matrix.append(tfidf_vec)
+
+        # free up GPU memory
+        d_tokens.copy_to_host()
+        self.idf_vec = d_idf_vec.copy_to_host()
 
         print(self.feature_matrix)
 
@@ -144,18 +151,39 @@ class Preprocessor(object):
 
         """
         print("[...] preprocessing observation for prediction")
+
         # convert blob to hex
         hex_blob = bytes.hex(blob)
+        # tokenize
+        observation = self.tokenize(hex_blob)
+        # set kernel params
+        threadsperblock = 1024
+        blockspergrid = (self.tokens.size + (threadsperblock - 1)) // threadsperblock
 
-        # FIXME: we need to put this into arrays, obs objects dont exist anymore
-        # create observation
-        observation = self.Observation(hex_blob, possible_labels)
-        # tokenize and calculate term frequencies
-        observation.compute_term_freq()
+        # copy data from host to device
+        d_observation = cuda.to_device(observation)
+        d_tokens = cuda.to_device(self.tokens)
+        d_idf_vec = cuda.to_device(self.idf_vec)
+
+        # create output array
+        tfidf_vec = np.empty(shape=self.tokens.shape, dtype=np.single)
+        d_tfidf_vec = cuda.to_device(tfidf_vec)
+
+        # FIXME: hacky solution to not knowing how to pass scalars
+        n = np.array((len(self.tokenized_obs),), dtype=np.uint32)
+
         # calculate tfidf vector
-        observation.tfidf_vec = self.extract_tfidf_vec(observation)
+        tfidf_kernel[blockspergrid, threadsperblock](d_observation, d_tokens, d_idf_vec, d_tfidf_vec, n)
+
+        # copy data back to host 
+        tfidf_vec = d_tfidf_vec.copy_to_host()
+        # free GPU memory
+        d_tokens.copy_to_host()
+        d_idf_vec.copy_to_host()
+        d_observation.copy_to_host()
+
         print("[+] preprocessed observation for prediction")
-        return observation
+        return tfidf_vec, possible_labels
 
 
 @cuda.jit
@@ -202,8 +230,6 @@ def idf_kernel(tokens, observations, idf_vals):
 
         # calculate according to formula
         idf_vals[position] = math.log(len(observations)) / count if count else 0
-
-
 
 
 @cuda.jit

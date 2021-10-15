@@ -73,39 +73,38 @@ if __name__ == "__main__":
     # create the preprocessor object
     preprocessor = preprocessor.Preprocessor()
 
+    num_obs = 10000
     # collect 300,000 observations
     # uncomment below if data is needed
-    #data_collector.collect(s, 300000, preprocessor.raw_data_file)
+    #data_collector.collect(s, num_obs, preprocessor.raw_data_file)
 
     # extract TF-IDF vector and populate feature matrix and label vector
-    feature_matrix = preprocessor.preprocess()
-    print('gpt here')
+    preprocessor.preprocess()
     # create the classifier object
-    classifier = classifier.Classifier(feature_matrix, preprocessor.labels, preprocessor.token_vec)
+    classifier = classifier.Classifier()
     
     # train the model given the collected observations and labels
-    classifier.train()
+    classifier.train(num_obs, preprocessor.labels, preprocessor.tokens)
 
-
-     
-    for _ in range(1000):
+    for _ in range(100):
         # query the /challenge endpoint
         s.get()
 
         # preprocess using the blob and possible ISAs
-        observation = preprocessor.prediction_preprocess(s.binary, s.targets) 
+        obs_tfidf_vec = preprocessor.prediction_preprocess(s.binary) 
 
         # make prediction!
-        target = classifier.predict(observation)
+        target = classifier.predict(obs_tfidf_vec, s.targets)
+        print(target)
         s.post(target)
         
-        s.save_test_data(preprocessor.raw_data, preprocessor.raw_data_file, s.binary, s.targets, s.ans)
-        s.log.info("Guess:[{: >9}]   Answer:[{: >9}]   Wins:[{: >3}]".format(target, s.ans, s.wins))
-        
-
+        #s.save_test_data(preprocessor.raw_data, preprocessor.raw_data_file, s.binary, s.targets, s.ans)
+        s.log.info("Guess:[{: >9}]   Answer:[{: >9}]   Wins:[{: >3}]".format(target[0], s.ans, s.wins))
+       
         # 500 consecutive correct answers are required to win
         # very very unlikely with current code
         if s.hash:
             s.log.info("You win! {}".format(s.hash))
+            exit()
 
     

@@ -3,6 +3,12 @@ import json
 import numpy as np
 import math
 from numba import cuda
+import pickle
+
+# number used to limit the amount of rows of the feature matrix
+# that can be held in memory at a time. If not utilized, program will be killed
+# since feature matrix is larger than amount of memory in deployment machine
+OBS_MEMORY_LIMIT = 1000
 
 class Preprocessor(object):
 
@@ -22,7 +28,7 @@ class Preprocessor(object):
         self.retreive_data()
 
         # list to store preprocessed feature matrix
-        self.feature_matrix = []
+        feature_matrix = []
         # list to store tokenized observations
         self.tokenized_obs = []
         # set to store all tokens observed
@@ -36,30 +42,36 @@ class Preprocessor(object):
             # update our colletion of all observed tokens
             token_set.update(tokenized_observation)
 
+        # FIXME: hasty memory optimization
+        self.observations = []
+        
         self.tokenized_obs = np.array(self.tokenized_obs)
         self.tokens = np.array(sorted(tuple(token_set)), dtype=np.uint32)
         # copy data to device
         d_tokenized_obs = cuda.to_device(self.tokenized_obs)
         d_tokens = cuda.to_device(self.tokens)
 
-        idf_vec = np.empty(shape=self.tokens.shape, dtype=np.single)
+        idf_vec = np.empty(shape=self.tokens.shape, dtype=np.double)
         d_idf_vec = cuda.to_device(idf_vec)
 
         # define kernel params 
         threadsperblock = 1024
         blockspergrid = (self.tokens.size + (threadsperblock - 1)) // threadsperblock
 
-        print("[...] computing inverse document frequency vector")
-        #FIXME: change idf vals to idf vec
         idf_kernel[blockspergrid, threadsperblock](d_tokens, d_tokenized_obs, d_idf_vec)
 
-        print("[+] computed inverse document frequency vector!")
+        # remove stopwords TODO
+        #self.remove_stopwords(90)
+        
 
         # free up memory
         d_tokenized_obs.copy_to_host()
 
+
+        idx = 0
         # compute tfdif vector for each observation
         for observation in self.tokenized_obs:
+            idx += 1
             # copy data to device
             tfidf_vec = np.empty(shape=self.tokens.shape, dtype=np.single)
             d_tfidf_vec = cuda.to_device(tfidf_vec)
@@ -74,15 +86,26 @@ class Preprocessor(object):
             tfidf_vec = d_tfidf_vec.copy_to_host()
             # free up memory
             d_observation.copy_to_host()
+            print(idx)
 
-            print(tfidf_vec)
-            self.feature_matrix.append(tfidf_vec)
+            feature_matrix.append(tfidf_vec)
+
+            if idx % OBS_MEMORY_LIMIT == 0:
+                # too much data in memory, gotta free some up
+                # create name of file
+                file_name = '../data/feature_matrix_' + str(idx // OBS_MEMORY_LIMIT)
+                print("throwing in" + file_name)
+                # throw into file as bytes
+                with open (file_name, 'wb') as file:
+                    pickle.dump(feature_matrix, file)
+                # make new list for next 10000 observation
+                feature_matrix.clear()
 
         # free up GPU memory
         d_tokens.copy_to_host()
-        self.idf_vec = d_idf_vec.copy_to_host()
+        d_idf_vec.copy_to_host()
 
-        print(self.feature_matrix)
+
 
  
     def retreive_data(self):
@@ -97,29 +120,26 @@ class Preprocessor(object):
         data_file = open(self.raw_data_file)
         raw_data = json.loads(data_file.readline())
 
-        # create our output lists; holding the binary blob, possible labels, 
+        # create our output lists; holding the binary blob
         # and true label for each observation respectively
         observations = []
-        possible_labels = []
-        true_labels = []
+        labels = []
 
         # populate our output lists
         for data_point in raw_data:
             observations.append(data_point['blob'])
-            possible_labels.append(data_point['possible_ISAs'])
-            true_labels.append(data_point['label'])
+            labels.append(data_point['label'])
 
         # convert our lists into np arrays for use with numba
-        self.observations = np.array(observations)
-        self.possible_labels = np.array(possible_labels)
-        self.true_labels = np.array(true_labels)
+        self.observations = np.array(observations[:10000])
+        self.labels = np.array(labels[:10000])
         print("[+] retreived data")
 
         return 
 
     def tokenize(self, observation): 
         """ 
-        returns a list of all possible tokens for this observation,
+        returns a numpy array of all possible tokens for this observation,
         where each token is encoded into a 32-bit unsigned integer
 
         word size: 1 byte
@@ -137,8 +157,13 @@ class Preprocessor(object):
                 all_tokens.extend(tokens)
         return np.array(all_tokens, dtype=np.uint32)
 
+    def remove_stopwords(self, q):
+        """
+        reduces the search space by eliminating tokens
+        with idf values greater than the q-th quantile
+        """
 
-    def prediction_preprocess(self, blob, possible_labels):
+    def prediction_preprocess(self, blob):
         """
         performs preprocessing for prediction (test set)
 
@@ -156,6 +181,7 @@ class Preprocessor(object):
         hex_blob = bytes.hex(blob)
         # tokenize
         observation = self.tokenize(hex_blob)
+
         # set kernel params
         threadsperblock = 1024
         blockspergrid = (self.tokens.size + (threadsperblock - 1)) // threadsperblock
@@ -183,7 +209,7 @@ class Preprocessor(object):
         d_observation.copy_to_host()
 
         print("[+] preprocessed observation for prediction")
-        return tfidf_vec, possible_labels
+        return tfidf_vec
 
 
 @cuda.jit

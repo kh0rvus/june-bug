@@ -3,19 +3,23 @@ june-bug
 
 Machine Learning Multi-Class Classifier to Solve Praetorian's MLB Challenge
 
-### The Problem
+### Table of Contents
+- [Problem Description](#problem)
+- [Method](#method)
+- [Drawbacks and Possible Improvements](#drawbacks)
+- [Technical Documentation](#documentation)
+
+### Problem Description
+----------------------------------------
 
 > "The crux of the challenge is to build a classifier that can automatically identify and categorize the instruction set architecture of a random binary blob. Train a machine learning classifier to identify the architecture of a binary blob given a list of possible architectures. We currently support twelve architectures, including: avr, alphaev56, arm, m68k, mips, mipsel, powerpc, s390, sh4, sparc, x86_64, and xtensa."
 
 > \- Challenge Description 
 
-
-
-### The Oracle
+#### The Oracle
 The `post(target)` method takes in a guess, and returns the streak, **correct answer**, as well as a hash used later to prove authenticity of solution. This is important because the correct answer allows us to avoid the problem of manual observation labeling, largely increasing the data we can feasibly equip our model with
 
-
-### Possible Labels
+#### Possible Labels
 - avr: 8-bit
 - alphaev56: 
 - arm: 32/64-bit
@@ -30,10 +34,11 @@ The `post(target)` method takes in a guess, and returns the streak, **correct an
 - xtensa: 16/24-bit
 
 
-## Method
+### Method
+----------------------------------
 
 #### Data Curation
-Using the provided API, my first step was to collect and format 300,000 data points.
+Using the provided API, my first step was to collect and format 800,000 data points.
 
 As a method of formatting, I opted to store the following values within python dictionaries for each observation aggregated together in a list containing all the observations:
 
@@ -81,26 +86,35 @@ Training the model consists of computing, for each label, the mean and standard 
 
 These statistics can then be used to describe a Guassian distribution for each token that will later be used for finding the probability of observing a certain tfidf weight for a certain token given a label
 
-##### Testing
-
 ## Optimization
 ### GPU-Enabled Parallel Extraction of Features
 
-## Code Documentation
+## Technical Documentation
+--------------------------
 
-### PreProcessor
+### `main.py`
 #### Data Structures
-- `observation`
-    - `term_freq()`:
-        - returns a dictionary containing the term frequency for each token in a [[given]] observation
+##### `Server`
+Provided object that serves as an api for communicating with the Praetorian challenge server
+
+#### Functions
+##### `Server._request()`
+
+##### `Server.get()`
+##### `Server.post()`
+##### `Server.save_test_data()`
+
+### `collector.py`
 #### Functions
 
-### Classifier
+##### `collect(server, num_obs, data_file)`
+First subroutine executed. `collect()` is responsible for receiving a number of observations to request through the `num_obs` parameter and requesting the specified amount of data using the provided `server` object before writing the data to a local file on the deployment machine whose path is provided through the `data_file` parameter.
+The `collect()` function achieves this by requesting a new binary blob and submitting an arbitrary prediction (in this case 'arm') in order to compile a set of blobs and their associated labels.
+
+### `preprocessor.py`
 #### Data Structures
-#### Functions
 
-### Feature Matrix
-
+##### Feature Matrix
 - N = observations
 - M = number of columns in the feature matrix 
 - &Theta; = number of tokens observed in corpus
@@ -144,6 +158,13 @@ Alphabetically-sorted single-dimension NumPy array containg all tokens for a tra
 
 example: 
 TODO throw an example here
+#### Functions
+
+### `classifier.py`
+#### Data Structures
+#### Functions
+
+
 
 
 

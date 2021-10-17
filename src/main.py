@@ -51,19 +51,6 @@ class Server(object):
         self.ans  = r.get('target', 'unknown')
         return r
 
-    def save_test_data(self, training_data, data_file_path, binary, possible_labels, answer):
-        """
-        optional functionality that allows the user to save test data 
-        allowing for less data waste than just disposing of observations
-        after attempting to predict
-        """
-        print(type(training_data))
-        new_obs = {"blob": binary, "possible_ISAs": possible_labels, "label": answer}
-        training_data.append(new_obs)
-        with open(data_file_path, 'w') as file:
-            json.dump(training_data, file)
-
-        return
 
 if __name__ == "__main__":
 

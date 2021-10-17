@@ -73,10 +73,10 @@ if __name__ == "__main__":
     # create the preprocessor object
     preprocessor = preprocessor.Preprocessor()
 
-    num_obs = 10000
+    num_obs = 500000
     # collect 300,000 observations
     # uncomment below if data is needed
-    #data_collector.collect(s, num_obs, preprocessor.raw_data_file)
+    data_collector.collect(s, num_obs, preprocessor.raw_data_file)
 
     # extract TF-IDF vector and populate feature matrix and label vector
     preprocessor.preprocess()
@@ -94,7 +94,7 @@ if __name__ == "__main__":
         obs_tfidf_vec = preprocessor.prediction_preprocess(s.binary) 
 
         # make prediction!
-        target = classifier.predict(obs_tfidf_vec, s.targets)
+        target = classifier.predict(obs_tfidf_vec, s.targets, num_obs)
         print(target)
         s.post(target)
         
@@ -105,6 +105,8 @@ if __name__ == "__main__":
         # very very unlikely with current code
         if s.hash:
             s.log.info("You win! {}".format(s.hash))
+            output_file = open("../flag.txt", 'w')
+            output_file.write(s.hash)
             exit()
 
     

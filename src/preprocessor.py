@@ -60,8 +60,16 @@ class Preprocessor(object):
 
         idf_kernel[blockspergrid, threadsperblock](d_tokens, d_tokenized_obs, d_idf_vec)
 
+        idf_vec = d_idf_vec.copy_to_host()
+        self.tokens = d_tokens.copy_to_host()
+
+        print("before removal: " + str(len(idf_vec)) + str(len(self.tokens)))
         # remove stopwords TODO
-        #self.remove_stopwords(90)
+        idf_vec = self.remove_stopwords(.99, idf_vec, len(self.tokenized_obs))
+        print("after removal: " +  str(len(idf_vec)) + str(len(self.tokens)))
+
+        d_idf_vec = cuda.to_device(idf_vec)
+        d_tokens = cuda.to_device(self.tokens)
         
 
         # free up memory
@@ -71,23 +79,24 @@ class Preprocessor(object):
         idx = 0
         # compute tfdif vector for each observation
         for observation in self.tokenized_obs:
+            print(observation)
             idx += 1
             # copy data to device
-            tfidf_vec = np.empty(shape=self.tokens.shape, dtype=np.single)
+            tfidf_vec = np.empty(shape=self.tokens.shape, dtype=np.double)
             d_tfidf_vec = cuda.to_device(tfidf_vec)
             d_observation = cuda.to_device(observation)
 
             # FIXME: hacky solution to not knowing how to pass scalars
             n = np.array((len(self.tokenized_obs),), dtype=np.uint32)
             # compute tfdif vector for this observation 
-            tfidf_kernel[blockspergrid, threadsperblock](d_observation, d_tokens, d_idf_vec, d_tfidf_vec, n)
+            tfidf_kernel[blockspergrid, threadsperblock](d_observation, d_tokens, d_idf_vec, n, d_tfidf_vec)
 
             # copy data back to host
             tfidf_vec = d_tfidf_vec.copy_to_host()
             # free up memory
             d_observation.copy_to_host()
-            print(idx)
 
+            print(tfidf_vec)
             feature_matrix.append(tfidf_vec)
 
             if idx % OBS_MEMORY_LIMIT == 0:
@@ -103,7 +112,7 @@ class Preprocessor(object):
 
         # free up GPU memory
         d_tokens.copy_to_host()
-        d_idf_vec.copy_to_host()
+        self.idf_vec = d_idf_vec.copy_to_host()
 
 
 
@@ -131,8 +140,8 @@ class Preprocessor(object):
             labels.append(data_point['label'])
 
         # convert our lists into np arrays for use with numba
-        self.observations = np.array(observations[:10000])
-        self.labels = np.array(labels[:10000])
+        self.observations = np.array(observations)
+        self.labels = np.array(labels)
         print("[+] retreived data")
 
         return 
@@ -157,11 +166,33 @@ class Preprocessor(object):
                 all_tokens.extend(tokens)
         return np.array(all_tokens, dtype=np.uint32)
 
-    def remove_stopwords(self, q):
+    def remove_stopwords(self, percentile, idf_vec, num_obs):
         """
         reduces the search space by eliminating tokens
         with idf values greater than the q-th quantile
         """
+
+        # find the stats for idf val 
+        print("max token: " + str(np.max(self.tokens)))
+        print("max: " + str(np.max(idf_vec)))
+        print("min: " + str(np.min(idf_vec)))
+        # set idf val limit to identify stopwords
+        lower_lim = math.log(num_obs / (num_obs * percentile))
+        print(lower_lim)
+        vals_to_delete = []
+        for idx in range(len(idf_vec)):
+            # if the idf value is less than the stop word limit 
+            is_stop_word = idf_vec[idx] < lower_lim
+            if is_stop_word:
+                vals_to_delete.append(idx)
+
+        self.tokens = np.delete(self.tokens, vals_to_delete)
+        idf_vec = np.delete(idf_vec, vals_to_delete)
+        print("new min: " + str(np.min(idf_vec)))
+
+        return idf_vec
+
+
 
     def prediction_preprocess(self, blob):
         """
@@ -192,14 +223,14 @@ class Preprocessor(object):
         d_idf_vec = cuda.to_device(self.idf_vec)
 
         # create output array
-        tfidf_vec = np.empty(shape=self.tokens.shape, dtype=np.single)
+        tfidf_vec = np.empty(shape=self.tokens.shape, dtype=np.double)
         d_tfidf_vec = cuda.to_device(tfidf_vec)
 
         # FIXME: hacky solution to not knowing how to pass scalars
         n = np.array((len(self.tokenized_obs),), dtype=np.uint32)
 
         # calculate tfidf vector
-        tfidf_kernel[blockspergrid, threadsperblock](d_observation, d_tokens, d_idf_vec, d_tfidf_vec, n)
+        tfidf_kernel[blockspergrid, threadsperblock](d_observation, d_tokens, d_idf_vec, n, d_tfidf_vec)
 
         # copy data back to host 
         tfidf_vec = d_tfidf_vec.copy_to_host()
@@ -245,17 +276,21 @@ def idf_kernel(tokens, observations, idf_vals):
         # iterating through all observations to search for this token
         for observation in observations:
             # FIXME: should be able to just remove redundancy of elements
-            for obs_token in observation:
+            token_not_found = True
+            idx = 0
+            while token_not_found and idx < len(observation):
+                obs_token = observation[idx]
                 if obs_token == token:
                     # increment count if token occurs in this observation
                     count += 1
-                    continue
+                    token_not_found = False
+                idx+= 1
 
         # should have been observed at least once if it was in the token vector
         assert (count > 0)
 
         # calculate according to formula
-        idf_vals[position] = math.log(len(observations)) / count if count else 0
+        idf_vals[position] = (math.log(len(observations) / count)) if count else 0.0
 
 
 @cuda.jit

@@ -2,6 +2,8 @@ import numpy as np
 from math import sqrt
 from math import pi
 from math import exp
+from math import isinf
+from math import isnan
 import preprocessor
 from numba import cuda
 import pickle
@@ -102,18 +104,18 @@ class Classifier(object):
             else:
                 # since we have already generated distributions,
                 # we need to update them with our new vals
-                old_stats = self.stats_by_label[label]
-                '''
-                new_stats = np.empty(shape=self.tokens.shape, dtype=object)
+                old_num_obs, old_mean_vec, old_sigma_vec = self.stats_by_label[label]
 
+                new_mean_vec = np.empty(shape=self.tokens.shape, dtype=np.double)
+                new_sigma_vec = np.empty(shape=self.tokens.shape, dtype=np.double)
 
                 # copy data to device
                 d_mini_batch = cuda.to_device(mini_batch)
                 d_tokens = cuda.to_device(self.tokens)
-                d_old_stats = cuda.to_device(old_stats)
-                d_new_stats = cuda.to_device(new_stats)
-                d_stats_by_label = cuda.to_device(self.stats_by_label)
-                
+                d_old_mean_vec = cuda.to_device(old_mean_vec)
+                d_old_sigma_vec = cuda.to_device(old_sigma_vec)
+                d_new_mean_vec = cuda.to_device(new_mean_vec)
+                d_new_sigma_vec = cuda.to_device(new_sigma_vec)
 
                 # define kernel params 
                 threadsperblock = 1024
@@ -123,25 +125,24 @@ class Classifier(object):
                 update_distributions[blockspergrid, threadsperblock](\
                         d_mini_batch,\
                         d_tokens,\
-                        d_old_stats,\
-                        d_new_stats,\
-                        d_stats_by_label)
+                        d_old_mean_vec,\
+                        d_old_sigma_vec,\
+                        old_num_obs,\
+                        d_new_mean_vec,\
+                        d_new_sigma_vec)
 
                 # retreive resultant array from device
-                new_stats = d_new_stats.copy_to_host()
+                new_mean_vec = d_new_mean_vec.copy_to_host()
+                new_sigma_vec = d_new_sigma_vec.copy_to_host()
 
                 # free up GPU memory
                 d_mini_batch.copy_to_host()
                 d_tokens.copy_to_host()
-                d_old_stats.copy_to_host()
-                d_stats_by_label.copy_to_host()
+                d_old_mean_vec.copy_to_host()
+                d_old_sigma_vec.copy_to_host()
 
                 # persist statistics across object state
-                self.stats_by_label[label] = new_stats
-                '''
-                self.stats_by_label[label] = \
-                    self.update_distributions(mini_batch, old_stats)
-
+                self.stats_by_label[label] = (old_num_obs + len(mini_batch), new_mean_vec, new_sigma_vec)
 
     def create_distributions(self, observations):
         """
@@ -152,7 +153,10 @@ class Classifier(object):
         # list of statistics for each token
         # at each index exists a 3 element tuple containing
         # (mean, std deviation, number of observations)
-        statistics = []
+        # FIXME: change this to numpy arrays
+        mean_vec = []
+        sigma_vec = [] 
+        num_obs = len(observations)
 
 
         # go through each column
@@ -165,92 +169,21 @@ class Classifier(object):
             for row in observations:
                 # add value to list 
                 vals.append(row[col])
+
         
             # compute std dev over list if there are any nonzero weights
-            sigma = np.longdouble(np.std(vals)) if any(vals) else 0.0
+            sigma = np.double(np.std(vals, dtype=np.float64)) if any(vals) else 0.0
             # compute mean over list if there are any nonzero weights
-            mean = np.longdouble(np.mean(vals)) if any(vals) else 0.0
+            mean = np.double(np.mean(vals, dtype=np.float64)) if any(vals) else 0.0
+            if isnan(mean) or isnan(sigma) or isinf(mean) or isinf(sigma):
+                sigma = 0
+            mean_vec.append(mean)
+            sigma_vec.append(sigma)
 
-            # add mean, std_dev, and n to statistics
-            statistics.append( (mean, sigma, len(observations)) )
-
-        return statistics
-
-
-
-    '''
-    @cuda.jit
-    def update_distributions(mini_batch, tokens, old_stats, new_stats, stats_by_label):
-        """
-        CUDA Kernel that updates the mean, standard deviation, 
-        and n of the tfidf weights
-
-        loop being represented is the iteration through all tokens,
-        such that each thread updates the distribution for a single token
-        given a mini batch of observations
-
-        """
-        position = cuda.threadIdx.x
-
-        if position < tokens.size:
-            mean, sigma, n = old_stats[position]
-
-            for tfidf_vec in mini_batch:
-                # dereference tfdidf weight for the token at position
-                new_weight = tfidf_vec[position]
-                # update number of observations
-                new_n = n + 1
-                # update mean
-                new_mean = np.double(((mean * n) + new_weight) / new_n)
-                # update std deviation
-                old_variance = sigma ** 2
-                new_variance = np.double(((n * old_variance) + (new_weight - new_mean) * (new_weight - mean)) / new_n)
-                # only perform sqauare root if we know variance is not 0
-                new_sigma = np.double(new_variance ** 0.5) if new_variance else 0.0
-
-                # set new stats as old stats so that next iteration of 
-                # the loop can continue updating the distribution
-                mean, sigma, n = (new_mean, new_sigma, new_n)
-
-            # save updated statistics for this token
-            new_stats[position] = ((mean, sigma, n))
-    '''
-
-    def update_distributions(self, observations, old_stats):
-        """
-        updates the mean, standard deviation, and n of the tfidf weights
-        for each token given a new mini batch
-        """
-        new_stats = []
-
-        for col in range(len(self.tokens)):
-            # derefence stats 
-            mean, sigma, n = old_stats[col]
-
-            for row in observations:
-                # dereference obs tfidfd weight for this token    
-                new_weight = row[col]
-                # update number of observations 
-                new_n = n + 1
-                # update mean
-                new_mean = np.longdouble(((mean * n) + new_weight) / new_n)
-                # update std dev
-                old_variance = sigma ** 2
-                new_variance = np.longdouble(((n * old_variance) + (new_weight - new_mean) * (new_weight - mean)) / new_n)
-                # only perform square root if we know variance is not 0
-                new_sigma = np.longdouble(new_variance ** 0.5) if new_variance else 0.0
-                
-                # set new stats as old stats so that next iteration of 
-                # the loop can continue updating the distribution
-                mean, sigma, n = (new_mean, new_sigma, new_n)
-
-            # now save stats for this batch 
-            new_stats.append((mean, sigma, n))
-            
-        return new_stats
+        return num_obs, mean_vec, sigma_vec
 
 
-    def predict(self, observation, possible_labels):
+    def predict(self, observation, possible_labels, num_obs):
         """
         P(label|observation) = 
 
@@ -280,17 +213,17 @@ class Classifier(object):
         # designated "possible labels"
         for label in possible_labels:
             # probability of observing this label in our training set
-            probability = float(self.stats_by_label[label]["num_obs"]) / len(self.feature_matrix)
+            probability = float(self.stats_by_label[label][0]) / num_obs
             print("starting prob:" + str(probability))
             # compute probability of tfidf weight for each token given this label
             for idx in range(len(self.tokens)):
                 observed_val = observation[idx]
                 # grab mean and sigma for this token given this label
-                mean = self.stats_by_label[label]["mean_vals"][idx]
-                sigma = self.stats_by_label[label]["sigma_vals"][idx]
+                mean = self.stats_by_label[label][1][idx]
+                sigma = self.stats_by_label[label][2][idx]
                 # if there is enough data for a distribution to have been 
                 # created
-                sufficient_data = bool(sigma)
+                sufficient_data = bool(sigma) and bool(mean)
                 # the token was observed in the observation we are trying
                 # to classify
                 token_observed = bool(observed_val)
@@ -298,23 +231,77 @@ class Classifier(object):
                 if sufficient_data and token_observed:
                     # calculate gaussian probability 
                     prob_of_tfidf_weight = calculate_gaussian_probability(observed_val, mean, sigma)
-                    # update probability of observing this label
-                    probability *= prob_of_tfidf_weight
+                    if not (isinf(prob_of_tfidf_weight) or isnan(prob_of_tfidf_weight)) and prob_of_tfidf_weight > 0 :
+                        # update probability of observing this label
+                        probability *= prob_of_tfidf_weight
 
             # double probability since we have reduced search in half
             probabilities[label] = probability * 2
             print(probabilities[label])
 
         # sort the probabilities by values, and return highest prob key-pair
-        prediction = sorted(probabilities.items(), key=lambda x: x[1])[0]
+        prediction = sorted(probabilities.items(), key=lambda x: x[1])[-1]
         print(probabilities)
 
         return prediction
+
+
+@cuda.jit
+def update_distributions(mini_batch, tokens, old_mean_vec, old_sigma_vec, old_num_obs, new_mean_vec, new_sigma_vec):
+    """
+    CUDA Kernel that updates the mean, standard deviation, 
+    and n of the tfidf weights
+
+    loop being represented is the iteration through all tokens,
+    such that each thread updates the distribution for a single token
+    given a mini batch of observations
+
+    """
+    position = cuda.threadIdx.x
+
+    if position < tokens.size:
+        mean = old_mean_vec[position]
+        sigma = old_sigma_vec[position]
+        n = old_num_obs
+
+        for tfidf_vec in mini_batch:
+            # dereference tfdidf weight for the token at position
+            new_weight = tfidf_vec[position]
+            # update number of observations
+            new_n = n + 1
+            # update mean
+            new_mean = np.float64(((mean * n) + new_weight) / new_n)
+            # update std deviation
+            old_variance = sigma ** 2
+            new_variance = np.double(((n * old_variance) + (new_weight - new_mean) * (new_weight - mean)) / new_n)
+            # only perform sqauare root if we know variance is not 0
+            new_sigma = np.double(new_variance ** 0.5) if new_variance else 0.0
+            if isnan(new_mean) or isnan(new_sigma) or isinf(new_mean) or isinf(new_sigma):
+
+                '''
+                print('old mean: ' + str(mean))
+                print('old sigma: ' + str(sigma))
+                print('new sigma: ' + str(new_sigma))
+                print('new mean: ' + str(new_mean))
+                print('failed update')
+                '''
+
+            # set new stats as old stats so that next iteration of 
+            # the loop can continue updating the distribution
+            mean, sigma, n = (new_mean, new_sigma, new_n)
+
+        # save updated statistics for this token
+        new_mean_vec[position] = mean
+        new_sigma_vec[position] = sigma
+
 
 # added decorator to explicitly cast and specify cuda as runtime
 def calculate_gaussian_probability(x, mean, sigma):
     """ Calculate the Gaussian probability distribution function for x
     """
+    
     exponent = exp(-((x - mean)**2 / (2 * sigma**2)))
-    return (1 / (sqrt(2 * pi) * sigma)) * exponent
+    result = (1 / (sqrt(2 * pi) * sigma)) * exponent
+
+    return result
 

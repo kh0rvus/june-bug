@@ -15,7 +15,11 @@ Machine Learning Multi-Class Classifier to Solve Praetorian's MLB Challenge
 
 > "The crux of the challenge is to build a classifier that can automatically identify and categorize the instruction set architecture of a random binary blob. Train a machine learning classifier to identify the architecture of a binary blob given a list of possible architectures. We currently support twelve architectures, including: avr, alphaev56, arm, m68k, mips, mipsel, powerpc, s390, sh4, sparc, x86_64, and xtensa."
 
-The challenge server generates a random program and compiles it under a random instruction set architecture (ISA). The available architectures are provided by the wonderfully versatile cross compiler: crosstool-ng. Once compiled, the server selects a random section of instruction aligned code (this matters later). Given this random section of code, the challenge is to identify the original ISA from a list of possible ISAs provided by the server. 
+The challenge server generates a random program and compiles it under a random instruction set architecture (ISA). 
+
+The available architectures are provided by the wonderfully versatile cross compiler: crosstool-ng. Once compiled, the server selects a random section of instruction aligned code (this matters later). 
+
+Given this random section of code, the challenge is to identify the original ISA from a list of possible ISAs provided by the server. 
 
 
 ### Method
@@ -52,6 +56,7 @@ TF-IDF aims to extract information from tokenized text data by assigning a weigh
 More specifically, tf-idf for token t can be described as:
 
 IDF(t): ln(total number of observations / number of observations in which t appeared)
+
 TF(t): (number of times t appears in a document) / (total number of terms in the document)
 
 TF-IDF(t): IDF(t) * TF(t)
@@ -71,8 +76,11 @@ Generally, the algorithm can be described as follows:
 3. Given a new observation, compute the probability of it belonging to each label using the following formula:
    
     P(observation | label) = P(token 0 tfidf weight| label) * ... * P(token m tfidf weight| label) * (P(label) * 2)
+    
     if label exists in the given possible labels 
+    
     else 
+    
     P(observation| label) = 0.0
 
 The reader may notice that the formula has been modified. Since the server helps us out by narrowing the options down to six labels as opposed to twelve, I scaled the probability of observing the label by 2 and abstained from calculating the probability at all if the label was not given as a possible label.
@@ -83,6 +91,14 @@ The reader may notice that the formula has been modified. Since the server helps
 
 
 ### Hyper Parameters
+the hyper parameters and constants for deployment are stored in `./src/hyper_params.py`
+
+- `NUM_OBS`: Number of observations in the training set
+- `OBS_MEMORY_LIMIT`: The maximum number of rows of the feature matrix that can be kept in memory at a time to reduce possibility of memory errors
+- `RAW_DATA_FILE`: The location of file that stores the raw training data
+- `STOP_WORD_PERCENTILE`: The percent of documents a token must appear in in order to be identified as stop-word
+- `THREADS`: The number of CUDA threads to initialize upon deployment of GPU Kernels
+
 
 ### `main.py`
 #### Data Structures

@@ -5,6 +5,8 @@ import time
 import preprocessor
 import classifier
 import data_collector
+import hyper_params
+
 
 logging.basicConfig(level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -51,62 +53,48 @@ class Server(object):
         self.ans  = r.get('target', 'unknown')
         return r
 
-    def save_test_data(self, training_data, data_file_path, binary, possible_labels, answer):
-        """
-        optional functionality that allows the user to save test data 
-        allowing for less data waste than just disposing of observations
-        after attempting to predict
-        """
-        print(type(training_data))
-        new_obs = {"blob": binary, "possible_ISAs": possible_labels, "label": answer}
-        training_data.append(new_obs)
-        with open(data_file_path, 'w') as file:
-            json.dump(training_data, file)
-
-        return
 
 if __name__ == "__main__":
 
     # create the server object
-    s = Server()
+    s = Server()     
+
+
+    # collect num_obs observations
+    # uncomment below if data is needed
+    #data_collector.collect(s, hyper_params.NUM_OBS, hyper_params.RAW_DATA_FILE)
 
     # create the preprocessor object
-    preprocessor = preprocessor.Preprocessor()
-
-    num_obs = 500000
-    # collect 300,000 observations
-    # uncomment below if data is needed
-    data_collector.collect(s, num_obs, preprocessor.raw_data_file)
+    preprocessor = preprocessor.Preprocessor() 
 
     # extract TF-IDF vector and populate feature matrix and label vector
     preprocessor.preprocess()
+
     # create the classifier object
     classifier = classifier.Classifier()
     
     # train the model given the collected observations and labels
-    classifier.train(num_obs, preprocessor.labels, preprocessor.tokens)
+    classifier.train(hyper_params.NUM_OBS, preprocessor.labels, preprocessor.tokens)
 
     for _ in range(100):
         # query the /challenge endpoint
         s.get()
 
-        # preprocess using the blob and possible ISAs
-        obs_tfidf_vec = preprocessor.prediction_preprocess(s.binary) 
+        # preprocess the blob we want to classify
+        obs_tfidf_vec = preprocessor.classification_preprocess(s.binary) 
 
-        # make prediction!
-        target = classifier.predict(obs_tfidf_vec, s.targets, num_obs)
+        # make classification!
+        target = classifier.classify(obs_tfidf_vec, s.targets)
         print(target)
         s.post(target)
         
-        #s.save_test_data(preprocessor.raw_data, preprocessor.raw_data_file, s.binary, s.targets, s.ans)
-        s.log.info("Guess:[{: >9}]   Answer:[{: >9}]   Wins:[{: >3}]".format(target[0], s.ans, s.wins))
+        s.log.info("Guess:[{: >9}]   Answer:[{: >9}]   Wins:[{: >3}]"
+                .format(target[0], s.ans, s.wins))
        
         # 500 consecutive correct answers are required to win
         # very very unlikely with current code
         if s.hash:
             s.log.info("You win! {}".format(s.hash))
-            output_file = open("../flag.txt", 'w')
-            output_file.write(s.hash)
             exit()
 
     

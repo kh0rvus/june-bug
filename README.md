@@ -26,14 +26,14 @@ Given this random section of code, the challenge is to identify the original ISA
 ----------------------------------
 
 #### Data Collection
-Using the provided API, my first step was to collect and format 800,000 data points.
+Using the provided API, my first step was to collect and format 1,000,000 data points.
 
 As a method of formatting, I opted to store the following values within python dictionaries for each observation aggregated together in a list containing all the observations:
 
 - `label`: extracted from `server.ans`, functions as the observation label, enabling us to train our model to produce accurate results
 - `blob`: a string storing the hexadecimal representation of the binary blob given by `server.binary`
 
-After requesting the 800,000 data points, the new training set is written to a local json file and the `data_collector.collect()` function can be commented out to reduce excessive traffic to the server.
+After requesting the 1,000,000 data points, the new training set is written to a local json file and the `data_collector.collect()` function can be commented out to reduce excessive traffic to the server.
 
 #### Preprocessing
 ##### Tokenization
@@ -145,7 +145,7 @@ Python object utilized for preprocessing the raw data and extracting an informat
 
 #### Functions
 ##### `Preprocessor.preprocess(self)`
-`Preprocessor.preprocess()` encodes the raw data collected from the challenge server into a feature matrix which contains a TF-IDF vector for each observation.
+encodes the raw data collected from the challenge server into a feature matrix which contains a TF-IDF vector for each observation.
 
 The overall subroutine consists of:
 1. Tokenization of all observations in the training set and population of `self.tokens`
@@ -160,23 +160,23 @@ Upon initial implementation, in a single-threaded CPU oriented environment, exec
 Additionaly, I recognized that though I had solved the time efficiency problem with GPU parallelization, I still had a memory issue due to the large dimensionality of the produced feature matrix. As a result, I decided to paritition the training data into mini-batches of size `OBS_MEMORY_LIMIT` and use the `pickle` module to serialize subsets of the feature_matrix and write them to files on the deployment machine to avoid keeping the entire feature matrix in memory.
 
 ##### `Preprocessor.retreive_data(self)`
-`Preprocessor.retreive_data()` populates `self.observations` and `self.labels` by opening up the raw data file whose path is provided by `RAW_DATA_FILE` and storing the raw blobs and their associated labels in the aforementioned arrays respectively.
+populates `self.observations` and `self.labels` by opening up the raw data file whose path is provided by `RAW_DATA_FILE` and storing the raw blobs and their associated labels in the aforementioned arrays respectively.
 
 ##### `Preprocessor.tokenize(self, observation)`
-`Preprocessor.tokenize()` recieves a binary blob in string representation through `observation` and extracts tokens of size 8, 16, and 32 bits to account for the fact the possible ISAs may have varying instruction size. Since 32 bits is the largest token size, and there shouldnt be negative values, the extracted tokens are stored as 32-bit unsigned integers and returned in a numpy array 
+recieves a binary blob in string representation through `observation` and extracts tokens of size 8, 16, and 32 bits to account for the fact the possible ISAs may have varying instruction size. Since 32 bits is the largest token size, and there shouldnt be negative values, the extracted tokens are stored as 32-bit unsigned integers and returned in a numpy array 
 
 ##### `Preprocessor.remove_stopwords(self)`
-`Preprocessor.remove_stopwords()` reduces the dimensionality of the feature matrix by eliminating stop words. This implementation defines stop words as tokens which appear in more than `STOP_WORDS_PERCENTILE` percent of the documents. After identifying the stop words, the token and its idf weight are removed from `self.tokens` and `self.idf_vec`
+reduces the dimensionality of the feature matrix by eliminating stop words. This implementation defines stop words as tokens which appear in more than `STOP_WORDS_PERCENTILE` percent of the documents. After identifying the stop words, the token and its idf weight are removed from `self.tokens` and `self.idf_vec`
 
 ##### `Preprocessor.classification_preprocess(self, blob)`
-`Preprocessor.classification_preprocess()` performs preprocessing for single observations belonging to the test set, identified by the `blob` parameter. Subroutine follows `Preprocessor.preprocess()`, with the only differences being that `Preprocessor.classification_preprocess()` preprocesses a single observation, as opposed to the entire training set, and an idf vector is not computed since it has already been saved to `self.idf_vec`
+performs preprocessing for single observations belonging to the test set, identified by the `blob` parameter. Subroutine follows `Preprocessor.preprocess()`, with the only differences being that `Preprocessor.classification_preprocess()` preprocesses a single observation, as opposed to the entire training set, and an idf vector is not computed since it has already been saved to `self.idf_vec`
 
 ##### `idf_kernel(tokens, observations, idf_vec)`
-`idf_kernel()` is a CUDA GPU Kernel which runs in a distributed manner by allocating for each token, a thread to compute the Inverse Document Frequency weight, resulting in the execution of `m` threads where `m` is the number of tokens observed in the corpus.
+a CUDA GPU Kernel which runs in a distributed manner by allocating for each token, a thread to compute the Inverse Document Frequency weight, resulting in the execution of `m` threads where `m` is the number of tokens observed in the corpus.
 By taking in the `tokens` parameter, a GPU device copy of `self.tokens`, each threads index is used to access its respective element of the `idf_vec`, which serves as the output array, and the `tokens` device array. Using `observations`, which contains the entire training set of tokenized observations, idf weights are extracted in a parallel manner for each token and stored in `idf_vec`, ultimately to be placed in `self.idf_vec` by the calling function (`Preprocessor.preprocess()`)
 
 ##### `tfidf_kernel(observation, tokens, idf_vec, tfidf_vec)`
-`tfidf_kernel()` is a CUDA GPU kernel which runs in a distributed manner by allocating for each token, a thread to compute the TF-IDF weight, resulting in the execution of `m` threads where `m` is the number of tokens observed in the corpus.
+a CUDA GPU kernel which runs in a distributed manner by allocating for each token, a thread to compute the TF-IDF weight, resulting in the execution of `m` threads where `m` is the number of tokens observed in the corpus.
 By taking the `tokens` parameter, a GPU device copy of `self.tokens`, each thread index is used to access its respective element of the `idf_vec` and `tokens` device array, to distributively compute the tfidf vector for `observation`, and store it in the output array; `tfidf_vec`.
 
 
@@ -194,7 +194,7 @@ Naive Bayes Classifier Implementation
 
 #### Functions
 ##### `Classifier.train(self, labels, tokens)`
-`Classifier.train()` trains the classifer on OBS_MEMORY_LIMIT sized mini-batches by using the first mini batch to generate a set of `m` distributions representing each tokens tfidf weight for each label, and then updating the distributions with the remaining mini-batches.
+trains the classifer on OBS_MEMORY_LIMIT sized mini-batches by using the first mini batch to generate a set of `m` distributions representing each tokens tfidf weight for each label, and then updating the distributions with the remaining mini-batches.
 
 Generally, the subroutine is as follows:
 1. Seperate the data by labels
@@ -203,31 +203,30 @@ Generally, the subroutine is as follows:
 Specifically, the training for the initial mini-batch versus the rest of the mini-batches differs due to the creation of statistics for the first mini-batch using the entire mini-batch, and the updating of statistics for the following mini-batches on an observation-wise basis.
 
 ##### `Classifier.seperate_by_labels(self, mini_batch, batch_num)`
-`Classifier.seperate_by_label()` uses the `batch_num` variable to compute the index of the label of an observation within the `mini-batch` and group all observations of this mini-batch by their respective label
+uses the `batch_num` variable to compute the index of the label of an observation within the `mini-batch` and group all observations of this mini-batch by their respective label
 
 ##### `Classifier.extract_statistics_by_label(self, mini_batch_by_label, batch_num)`
-`Classifier.extract_statistics_by_label()` iterates through the dictionary, `mini_batch_by_label` to extract the statistics for each tokens tfidf weight within a given label. If the batch number is 0, `self.create_distributions()` is called to initalize the distributions, else, the `update_distributions()` CUDA kernel is called to update the statistics in a distributed manner.
+iterates through the dictionary, `mini_batch_by_label` to extract the statistics for each tokens tfidf weight within a given label. If the batch number is 0, `self.create_distributions()` is called to initalize the distributions, else, the `update_distributions()` CUDA kernel is called to update the statistics in a distributed manner.
 Ultimately, the new statistics are updated and persisted by storage within the `self.stats_by_label` Dictionary.
 
 ##### `Classifier.create_distributions(self, observations)`
-`Classifier.create_distributions()` extracts the mean and standard deviation of the tfidf weights for each token so that distributions may be created to find the probability of a label given a tfidf vector during test-set classification. Since this is the creation, we simply aggregate all the observed tfidf weights belonging to a given token and use Numpy's `std()` and `mean()` functions to calculate the statistics
+extracts the mean and standard deviation of the tfidf weights for each token so that distributions may be created to find the probability of a label given a tfidf vector during test-set classification. Since this is the creation, we simply aggregate all the observed tfidf weights belonging to a given token and use Numpy's `std()` and `mean()` functions to calculate the statistics
 After computing the statistics, the number of observations (`num_obs`), array of all `mean` tfidf weights, and standard deviation (`sigma`) of all tfidf weights are returned.
 
 ##### `Classifier.classify(self, observation, possible_labels)`
-`Classifier.classify()` takes in a single binary blob referenced by `observation` as well as the possible labels for this blob stored in `possible_labels` and uses the precomputed statistics for each tokens tfidf weight seperated by label in order to compute the probability of an observation belonging to a given label using the Modified Naive Bayes Formula discussed in the *Method* section.
+takes in a single binary blob referenced by `observation` as well as the possible labels for this blob stored in `possible_labels` and uses the precomputed statistics for each tokens tfidf weight seperated by label in order to compute the probability of an observation belonging to a given label using the Modified Naive Bayes Formula discussed in the *Method* section.
 Ultimately, the predicted label, `prediction`, is returned to be sent to the challenge server.
 
 ##### `update_distributions(mini_batch, tokens, old_mean_vec, old_sigma_vec, old_num_obs, new_mean_vec, new_sigma_vec)`
-`update_distributions()` is a CUDA GPU Kernel that updates the statistics for the tfidf weights for each token within a label class.
+a CUDA GPU Kernel that updates the statistics for the tfidf weights for each token within a label class.
 Subroutine differs from create_distributions due to the running standard devation and mean computation which operate on each element in the mini-batch rather than the entire mini-batch. Since this introduces some overhead, the function was made into a CUDA Kernel so that `m` threads can be deployed to extract the statistics for each token in parallel.
 
 ##### `calculate_gaussian_probability(x, mean, sigma)`
-`calculate_gaussian_probability()` receives an observed value, `x`, along with a `mean` and `sigma` and computes the probability of observing `x` under the assumption that the distribution is normally distributed.
+receives an observed value, `x`, along with a `mean` and `sigma` and computes the probability of observing `x` under the assumption that the distribution is normally distributed.
 
 
 ## Misc
 ---------------------
-- My cookie: 0ccbc0c1-e093-4329-9fea-76f78f2b076c
 - Interesting related work: [Skip-Thought Vectors](https://arxiv.org/abs/1506.06726)
 
 
